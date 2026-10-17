@@ -136,6 +136,9 @@ src/
     SavedSheet.tsx      saved list
     SettingsSheet.tsx   settings
     Diagnostic.tsx      "can't reach Danbooru" screen
+
+public/
+  _headers              Cloudflare Pages cache + security headers
 ```
 
 ## Build
@@ -144,3 +147,59 @@ src/
 npm run build
 npm run preview
 ```
+
+## Deploy
+
+The app is a static bundle: no server, no database, no API keys, no environment variables. The
+build output in `dist/` can be served by anything.
+
+### Cloudflare Pages (recommended)
+
+Chosen because it is the only major free host with no bandwidth cap, and because the app barely uses
+any anyway — every byte of media comes from `cdn.donmai.us`, so a visitor only downloads the ~300 KB
+bundle. There are no repo-side settings needed: Pages detects Vite.
+
+Connect the repository in the Cloudflare dashboard, then:
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | `Vite` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+Every push to `main` then redeploys automatically. `public/_headers` ships with the build and gives
+hashed `/assets/*` a one-year immutable cache while keeping `index.html` revalidating, so a deploy is
+picked up immediately instead of behind a stale shell.
+
+No `base` is needed because Pages serves from the domain root. It *would* be needed for subpath
+hosting such as a GitHub Pages project site (`https://user.github.io/repo/`), where the default
+absolute `/assets/...` URLs 404 and the page renders blank. One line fixes it:
+
+```ts
+// vite.config.ts
+export default defineConfig({ base: '/repo-name/', /* ... */ })
+```
+
+There are also no SPA rewrite rules to configure: the app has no router, so every route is `/`.
+
+### Alternatives
+
+Netlify and Vercel work the same way with zero config (root path). GitHub Pages also works but needs
+the `base` line above plus a build workflow, and its CDN is slower.
+
+### Testing on a phone before deploying
+
+```bash
+npm run build
+npm run preview -- --host
+```
+
+Open the printed LAN URL on a phone to feel the swipe gestures for real.
+
+### Important caveat for whoever visits the site
+
+Hosting does **not** work around the DNS block described above. The browser fetches
+`danbooru.donmai.us` directly and the server is never in the path, so a visitor on a network that
+redirects `*.donmai.us` will get the diagnostic screen rather than the feed. Making it work for them
+would require a server-side proxy that streams the media too, which is a different architecture and
+no longer free.
