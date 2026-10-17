@@ -15,8 +15,10 @@ Pure client-side: no backend, no accounts, no build server. Everything it needs 
 <img src="docs/feed.png" width="250" alt="A post in the feed: media, tag chips, and the actions rail"> <img src="docs/related.png" width="250" alt="The More like this sheet, listing tags Danbooru sees alongside the artist"> <img src="docs/shortcuts.png" width="250" alt="The keyboard map, listed in the app">
 
 A post, "More like this", and the keyboard map. All three come from `npm run shots -- --readme`:
-the real build, screenshotted in headless Chrome against a placeholder image. No artwork is
-included in this repository — every image the app shows is loaded from Danbooru at runtime.
+the real build, screenshotted in headless Chrome against a placeholder image. The setting is
+deliberate: a gallery label under each post, tags in mono because they are codes rather than names,
+and chrome that steps back once you stop touching it. No artwork is included in this repository —
+every image the app shows is loaded from Danbooru at runtime.
 
 ## What it does
 
@@ -32,7 +34,7 @@ included in this repository — every image the app shows is loaded from Danboor
 | More like this | Tap the compass — or press `r` — for what Danbooru sees alongside the post's artist (or character, or series); every row is a search, at this browser's rating. The list ahead is prefetched only after the sheet has been opened once |
 | Fetch ahead | The next page is asked for once a few slides are left, not when the bottom arrives |
 | Tag actions | Hold a tag chip — or right-click it — to search it here, open it on Danbooru, read its wiki, or copy the search link |
-| Rating | Safe by default; Moderate/Everything opt-in per browser |
+| Rating | Safe by default; Moderate/Everything opt-in per browser, with the mode stamped beside the wordmark |
 | Recent searches | An empty search box offers your last few searches; tap one to run it again |
 | Backup | Saved posts, recent searches and settings to one JSON file — and back in, merged |
 | Share | Copy the post link, the media link, or a `?q=` link that opens this search elsewhere |
@@ -41,7 +43,8 @@ included in this repository — every image the app shows is loaded from Danboor
 | Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save — `?` lists the rest |
 | Failures | A dropped connection or a 5xx is retried twice before the error card; a 4xx is final |
 | Offline shell | A service worker keeps the app itself cached, so it opens without a network (the API and the media still need one) |
-| Motion | `prefers-reduced-motion` stops the autoplay, the gliding scroll and the sheet animations |
+| Quiet chrome | Four seconds without a touch and the label and the rail step back to a quarter; any pointer, key or new slide brings them straight back |
+| Motion | `prefers-reduced-motion` stops the autoplay, the gliding scroll, the caption settle and the sheet animations |
 
 ## Deliberate limits
 
