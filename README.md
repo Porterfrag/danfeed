@@ -49,21 +49,6 @@ for the wrong thing. The UI shows `label` and inserts `value`.
 Suggestions are cached per prefix and debounced at 150 ms, and autocomplete has its own request lane
 so typing never queues behind a feed page load.
 
-## The home button
-
-Tapping the **danfeed** logo resets the app to the state a page reload would give:
-
-- search cleared, filter chip back to *All*
-- pasted URLs removed from the feed
-- scrolled back to the top
-- **view history cleared**
-
-That last one matters. View history is what stops infinite scroll from repeating posts, so leaving it
-intact would make "go home" resume mid-stream instead of showing the newest posts again. Clearing it
-is what makes the button feel like a refresh rather than a scroll-to-top.
-
-Saved items and settings are untouched — those live in `localStorage`, not in page state.
-
 ## The 2-tag limit
 
 Danbooru rejects searches with more than two tags:
