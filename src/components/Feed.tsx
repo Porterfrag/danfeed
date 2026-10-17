@@ -37,6 +37,8 @@ interface Props {
   onHomeClick: () => void
   /** Search one tag, whichever category it belongs to. */
   onTagClick: (tag: string) => void
+  /** Open the full tag list for a post. */
+  onShowAllTags: (item: MediaItem) => void
   /** True when the feed is allowed past the general rating. Drives the settings badge. */
   nsfw: boolean
 }
@@ -68,6 +70,7 @@ export function Feed({
   onHomeClick,
   nsfw,
   onTagClick,
+  onShowAllTags,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -181,6 +184,7 @@ export function Feed({
               onSave={onSave}
               onToggleMute={onToggleMute}
               onTagClick={onTagClick}
+              onShowAllTags={onShowAllTags}
             />
           </div>
         ))}

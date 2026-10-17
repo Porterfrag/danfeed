@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { MediaItem } from '../types'
 import { tagLabel } from '../lib/danbooru'
+import { TAG_CATEGORY } from '../lib/tagCategories'
+import type { TagCategoryKey } from '../lib/tagCategories'
 import { useZoom } from '../lib/useZoom'
 import {
   IconBookmark,
@@ -24,47 +26,49 @@ interface Props {
   onToggleMute: () => void
   /** Search one tag, whichever category it belongs to. */
   onTagClick: (tag: string) => void
-}
-
-const MAX_TAG_CHIPS = 5
-
-interface EntityKind {
-  key: 'artist' | 'character' | 'copyright'
-  read: (item: MediaItem) => string[]
-  /** Chips shown before the rest collapse into "+N". */
-  max: number
-  /** Dot colour, following Danbooru's own category colours. */
-  dot: string
-  aria: string
+  /** Open the full tag list for this post. */
+  onShowAllTags: (item: MediaItem) => void
 }
 
 /**
- * Browsable entity tags, in display order.
+ * How many chips each family gets in the slide row before "+N" takes over.
  *
- * The hues are Danbooru's own taxonomy — artist red, character green, copyright
- * purple — so the row reads the way the site does.
+ * Capped per category rather than for the row as a whole. Group pictures routinely carry
+ * several characters, and a single shared cap would push the series off the slide entirely,
+ * which is the tag most likely to identify the work.
  *
- * Each category is capped separately rather than capping the row as a whole. Group
- * pictures routinely carry several characters, and a single shared cap would push the
- * copyright off the slide entirely, which is the tag most likely to identify the work.
+ * Meta is zero on purpose: `highres` alone covers 8.3M posts and `bad_id` means the post's ID
+ * is wrong, so they are flags rather than things worth browsing. They stay reachable in the
+ * all-tags sheet.
  */
-const ENTITY_KINDS: EntityKind[] = [
-  { key: 'artist', read: (i) => i.artists, max: 2, dot: 'bg-red-400', aria: 'Show more by artist' },
-  {
-    key: 'character',
-    read: (i) => i.characters,
-    max: 2,
-    dot: 'bg-green-400',
-    aria: 'Show more of character',
-  },
-  {
-    key: 'copyright',
-    read: (i) => i.copyrights,
-    max: 1,
-    dot: 'bg-purple-400',
-    aria: 'Show more from',
-  },
-]
+const ROW_CAPS: Record<TagCategoryKey, number> = {
+  artist: 2,
+  character: 2,
+  copyright: 1,
+  general: 5,
+  meta: 0,
+}
+
+/** The families that get a dot and a chevron in the row above the general tags. */
+const ROW_ENTITY_KEYS: TagCategoryKey[] = ['artist', 'character', 'copyright']
+
+/**
+ * The "+N" standing in for the tags a row is not showing. Tapping it opens the full list, which
+ * is the only way to reach them: the median post carries 27 general tags and the row shows five.
+ */
+function MoreTags({ count, onClick }: { count: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Show all tags"
+      className="relative flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2 py-1 text-[11px] font-medium text-white/60 ring-1 ring-inset ring-white/15 backdrop-blur-md transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/20 hover:text-white/90 active:scale-95"
+    >
+      +{count}
+      <IconChevronRight className="h-3 w-3 shrink-0" />
+    </button>
+  )
+}
 
 const RATING_LABEL: Record<string, string> = {
   g: 'General',
@@ -97,6 +101,7 @@ export function PostView({
   onSave,
   onToggleMute,
   onTagClick,
+  onShowAllTags,
 }: Props) {
   const isVideo = item.kind === 'video' || item.kind === 'ugoira'
   const isEmbed = item.kind === 'embed'
@@ -220,29 +225,30 @@ export function PostView({
 
   const rating = item.rating?.toLowerCase()
 
-  // `tag_string` already contains every category, so the generic chip row would show
-  // artists, characters and copyrights a second time. They get the browsable row.
+  // `tag_string` contains every category, so the general row would show artists, characters,
+  // series and meta a second time. Each is subtracted out and given its own treatment.
   const { entityChips, hiddenEntityCount } = useMemo(() => {
     const chips: Array<{ key: string; tag: string; dot: string; aria: string }> = []
     let hidden = 0
-    for (const kind of ENTITY_KINDS) {
-      const list = kind.read(item)
-      for (const tag of list.slice(0, kind.max)) {
-        chips.push({ key: `${kind.key}:${tag}`, tag, dot: kind.dot, aria: kind.aria })
+    for (const key of ROW_ENTITY_KEYS) {
+      const spec = TAG_CATEGORY[key]
+      const tags = spec.read(item)
+      const cap = ROW_CAPS[key]
+      for (const tag of tags.slice(0, cap)) {
+        chips.push({ key: `${key}:${tag}`, tag, dot: spec.dot, aria: spec.aria })
       }
-      if (list.length > kind.max) hidden += list.length - kind.max
+      if (tags.length > cap) hidden += tags.length - cap
     }
     return { entityChips: chips, hiddenEntityCount: hidden }
   }, [item])
 
-  const entityTags = useMemo(
-    () => new Set([...item.artists, ...item.characters, ...item.copyrights]),
-    [item],
-  )
-  const otherTags = useMemo(
-    () => item.tags.filter((tag) => !entityTags.has(tag)),
-    [item.tags, entityTags],
-  )
+  const generalTags = useMemo(() => TAG_CATEGORY.general.read(item), [item])
+
+  // Meta counts towards "+N" as well as hidden general tags: the row never shows meta, so it
+  // always has to be counted or a post with a few general tags and some meta would have no way
+  // into the sheet at all.
+  const hiddenTagCount =
+    Math.max(0, generalTags.length - ROW_CAPS.general) + item.metaTags.length
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
@@ -360,7 +366,7 @@ export function PostView({
         {/* Browsable entity tags. Tapping one searches that exact tag, so the feed
             becomes "everything else with this artist / character / series". */}
         {entityChips.length > 0 && (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             {entityChips.map((chip) => (
               <button
                 key={chip.key}
@@ -377,24 +383,31 @@ export function PostView({
               </button>
             ))}
             {hiddenEntityCount > 0 && (
-              <span className="px-1 text-[11px] text-white/50">+{hiddenEntityCount}</span>
+              <MoreTags count={hiddenEntityCount} onClick={() => onShowAllTags(item)} />
             )}
           </div>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
-          {otherTags.slice(0, MAX_TAG_CHIPS).map((tag) => (
-            <span
+        {/* General tags. Same one-tap search as the row above, kept visually quieter because
+            these are broad descriptors rather than who or what the post is.
+
+            The pill is small, so the hit area is grown 4px on every side by a pseudo-element —
+            exactly the row gap, so neighbouring targets meet without overlapping. That puts the
+            target at roughly 33px, and the all-tags sheet covers the rest. */}
+        <div className="flex flex-wrap gap-2">
+          {generalTags.slice(0, ROW_CAPS.general).map((tag) => (
+            <button
               key={tag}
-              className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/85 backdrop-blur-sm"
+              type="button"
+              onClick={() => onTagClick(tag)}
+              aria-label={`${TAG_CATEGORY.general.aria} ${tagLabel(tag)}`}
+              className="relative rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85 ring-1 ring-inset ring-white/15 backdrop-blur-md transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/20 active:scale-95"
             >
               #{tag}
-            </span>
+            </button>
           ))}
-          {otherTags.length > MAX_TAG_CHIPS && (
-            <span className="px-1 py-0.5 text-[11px] text-white/50">
-              +{otherTags.length - MAX_TAG_CHIPS}
-            </span>
+          {hiddenTagCount > 0 && (
+            <MoreTags count={hiddenTagCount} onClick={() => onShowAllTags(item)} />
           )}
         </div>
 

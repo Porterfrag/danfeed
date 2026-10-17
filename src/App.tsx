@@ -4,6 +4,7 @@ import { Feed } from './components/Feed'
 import { AddUrlSheet } from './components/AddUrlSheet'
 import { SettingsSheet } from './components/SettingsSheet'
 import { SavedSheet } from './components/SavedSheet'
+import { TagsSheet } from './components/TagsSheet'
 import { useFeed } from './hooks/useFeed'
 import { loadSaved, loadSettings, saveSaved, saveSettings } from './lib/store'
 import type { Settings } from './lib/store'
@@ -17,6 +18,8 @@ export default function App() {
   const [saved, setSaved] = useState<MediaItem[]>(() => loadSaved())
   const [extras, setExtras] = useState<MediaItem[]>([])
   const [sheet, setSheet] = useState<SheetName>(null)
+  /** The post whose full tag list is open, if any. */
+  const [tagsItem, setTagsItem] = useState<MediaItem | null>(null)
   const [scrollSignal, setScrollSignal] = useState(0)
 
   useEffect(() => {
@@ -55,6 +58,7 @@ export default function App() {
   const goHome = useCallback(() => {
     setExtras([])
     setSheet(null)
+    setTagsItem(null)
     setScrollSignal((n) => n + 1)
     resetToDefault()
   }, [resetToDefault])
@@ -108,6 +112,7 @@ export default function App() {
         onHomeClick={goHome}
         nsfw={settings.rating !== 'general'}
         onTagClick={browseTag}
+        onShowAllTags={setTagsItem}
       />
 
       <AddUrlSheet
@@ -135,6 +140,15 @@ export default function App() {
         savedCount={saved.length}
         onClearSaved={() => setSaved([])}
         onClearHistory={feed.clearHistory}
+      />
+
+      <TagsSheet
+        item={tagsItem}
+        onClose={() => setTagsItem(null)}
+        onPick={(tag) => {
+          setTagsItem(null)
+          browseTag(tag)
+        }}
       />
     </>
   )
