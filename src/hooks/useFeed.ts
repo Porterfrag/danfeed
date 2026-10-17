@@ -37,6 +37,7 @@ export function useFeed() {
   const [error, setError] = useState<BooruError | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [tagLimit, setTagLimit] = useState<TagLimitState | null>(null)
+  const [homeSignal, setHomeSignal] = useState(0)
 
   const cursorRef = useRef<string | null>(null)
   const hasMoreRef = useRef(true)
@@ -175,6 +176,23 @@ export function useFeed() {
     [chipTags],
   )
 
+  /**
+   * Return to a pristine feed, the same state a page reload would give:
+   * no search, no filter chip, and no view history.
+   *
+   * Clearing the history matters — without it the reload would skip everything
+   * already scrolled past and resume mid-stream instead of showing the newest
+   * posts again.
+   */
+  const resetToDefault = useCallback(() => {
+    seenRef.current = new Set()
+    setQueryInput('')
+    setQuery('') // assign directly so the reload does not wait on the debounce
+    setChip('all')
+    // Guarantees the reload even when the tags are already at their defaults.
+    setHomeSignal((n) => n + 1)
+  }, [])
+
   useEffect(() => {
     const analysis = analyzeTags(tags)
     overLimitRef.current = analysis.over
@@ -189,7 +207,7 @@ export function useFeed() {
 
     setTagLimit(null)
     void loadMore()
-  }, [tags, chipTags, reset, loadMore])
+  }, [tags, chipTags, reset, loadMore, homeSignal])
 
   return {
     items,
@@ -205,6 +223,7 @@ export function useFeed() {
     loadMore,
     retry,
     clearHistory,
+    resetToDefault,
   }
 }
 

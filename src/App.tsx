@@ -12,6 +12,7 @@ type SheetName = 'add' | 'saved' | 'settings' | null
 
 export default function App() {
   const feed = useFeed()
+  const { resetToDefault } = feed
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const [saved, setSaved] = useState<MediaItem[]>(() => loadSaved())
   const [extras, setExtras] = useState<MediaItem[]>([])
@@ -47,6 +48,17 @@ export default function App() {
     setScrollSignal((n) => n + 1)
   }, [])
 
+  /**
+   * Tapping the danfeed logo behaves like a page reload: back to the top of the
+   * default feed, with any pasted URLs and the current search cleared.
+   */
+  const goHome = useCallback(() => {
+    setExtras([])
+    setSheet(null)
+    setScrollSignal((n) => n + 1)
+    resetToDefault()
+  }, [resetToDefault])
+
   const items = useMemo(() => [...extras, ...feed.items], [extras, feed.items])
 
   const maxBytes = settings.maxVideoMb * 1024 * 1024
@@ -80,6 +92,7 @@ export default function App() {
         onAddClick={() => setSheet('add')}
         onSavedClick={() => setSheet('saved')}
         onSettingsClick={() => setSheet('settings')}
+        onHomeClick={goHome}
       />
 
       <AddUrlSheet

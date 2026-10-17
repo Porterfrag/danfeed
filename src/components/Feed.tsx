@@ -34,6 +34,7 @@ interface Props {
   onAddClick: () => void
   onSavedClick: () => void
   onSettingsClick: () => void
+  onHomeClick: () => void
 }
 
 export function Feed({
@@ -60,6 +61,7 @@ export function Feed({
   onAddClick,
   onSavedClick,
   onSettingsClick,
+  onHomeClick,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -182,7 +184,15 @@ export function Feed({
       <div className="safe-t pointer-events-none absolute inset-x-0 top-0 z-30">
         <div className="pointer-events-auto bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 pb-3 pt-2">
           <div className="flex items-center gap-2">
-            <span className="shrink-0 text-sm font-bold tracking-tight">danfeed</span>
+            <button
+              type="button"
+              onClick={onHomeClick}
+              aria-label="danfeed — back to the default feed"
+              title="Back to the default feed"
+              className="-ml-1 shrink-0 rounded-lg px-1.5 py-1 text-sm font-bold tracking-tight transition hover:bg-white/10 active:scale-95"
+            >
+              danfeed
+            </button>
 
             <TagSearch value={queryInput} onChange={setQueryInput} />
 
