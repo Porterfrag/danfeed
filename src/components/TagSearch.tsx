@@ -47,11 +47,31 @@ export function TagSearch({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
+  /**
+   * The last value that actually came out of this input.
+   *
+   * Text reaches the box two ways: typed into it, or set from outside — tapping a tag chip
+   * on a slide, or tapping the logo to reset the feed. Suggestions are a typing aid, so
+   * only the first should fetch anything or open the panel. Without this the two are
+   * indistinguishable, and browsing a tag dropped the suggestion list over the feed the
+   * user was trying to look at.
+   */
+  const typedRef = useRef(value)
+
   // Complete only the word being typed, keeping earlier tags intact.
   const { token } = splitQuery(value)
   const query = token.trim()
 
   useEffect(() => {
+    if (value !== typedRef.current) {
+      // Someone else set the text. Put the panel away rather than completing their word.
+      setItems([])
+      setOpen(false)
+      setLoading(false)
+      setDone(false)
+      return
+    }
+
     if (!query) {
       setItems([])
       setOpen(false)
@@ -95,7 +115,7 @@ export function TagSearch({ value, onChange }: Props) {
     }, 150)
 
     return () => clearTimeout(timer)
-  }, [query])
+  }, [value, query])
 
   const accept = useCallback(
     (tag: TagSuggestion) => {
@@ -161,7 +181,10 @@ export function TagSearch({ value, onChange }: Props) {
       <input
         ref={inputRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          typedRef.current = e.target.value
+          onChange(e.target.value)
+        }}
         onKeyDown={onKeyDown}
         onFocus={() => {
           setFocused(true)

@@ -50,6 +50,15 @@ for the wrong thing. The UI shows `label` and inserts `value`.
 Suggestions are cached per prefix and debounced at 150 ms, and autocomplete has its own request lane
 so typing never queues behind a feed page load.
 
+Suggestions belong to the input, not to the search text — text also arrives in the box from outside
+it (tapping a tag chip on a slide, resetting to the default feed), and that must not fire a request
+or drop the suggestion panel over the feed the user is browsing. `TagSearch` tracks the last value
+that actually came out of the input and only completes for those. The visible symptom of getting
+this wrong: tap a tag on a slide and a ~256px suggestion panel unfolds over the top of the feed,
+hiding the very thing you just searched for.
+
+Focusing the box on its own does not summon the panel either; it opens when you type.
+
 ## Browsing tags
 
 Every slide carries a browsable row above the `#tag` chips: the **artist** who drew it, the
