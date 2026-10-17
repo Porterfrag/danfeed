@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-t {
+  padding-top: env(safe-area-inset-top);
+}
+
+@keyframes df-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.df-fade-up {
+  animation: df-fade-up 180ms ease-out both;
+}
+
+@keyframes df-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.df-fade-in {
+  animation: df-fade-in 150ms ease-out both;
+}
+
+@keyframes df-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.df-spin {
+  animation: df-spin 700ms linear infinite;
+}
