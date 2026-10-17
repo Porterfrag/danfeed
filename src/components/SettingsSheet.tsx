@@ -1,4 +1,5 @@
 import type { Settings } from '../lib/store'
+import type { RatingLevel } from '../lib/tagQuery'
 import { Sheet } from './Sheet'
 import { IconTrash } from './icons'
 
@@ -50,6 +51,61 @@ function Toggle({
   )
 }
 
+const RATING_OPTIONS: Array<{ value: RatingLevel; label: string; hint: string }> = [
+  { value: 'general', label: 'Safe', hint: 'General rating only' },
+  { value: 'sensitive', label: 'Moderate', hint: 'General + sensitive' },
+  { value: 'all', label: 'Everything', hint: 'Includes questionable and explicit' },
+]
+
+function RatingSelector({
+  value,
+  onChange,
+}: {
+  value: RatingLevel
+  onChange: (next: RatingLevel) => void
+}) {
+  const active = RATING_OPTIONS.find((option) => option.value === value) ?? RATING_OPTIONS[0]
+  const explicit = value !== 'general'
+
+  return (
+    <div className="pb-4">
+      <span className="block text-sm text-white">Content rating</span>
+      <p className="mb-2 text-xs text-white/45">{active.hint}</p>
+
+      <div className="flex gap-1 rounded-xl bg-black/40 p-1">
+        {RATING_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={value === option.value}
+            className={`flex-1 rounded-lg py-2 text-xs font-medium transition ${
+              value === option.value
+                ? explicit && option.value === 'all'
+                  ? 'bg-rose-500/80 text-white'
+                  : explicit
+                    ? 'bg-amber-400/80 text-black'
+                    : 'bg-white text-black'
+                : 'text-white/60 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {explicit && (
+        <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
+          {value === 'sensitive'
+            ? 'Sensitive content is now included in the feed.'
+            : 'Everything is now included — general, sensitive, questionable and explicit.'}{' '}
+          This is saved to this browser only.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function SettingsSheet({
   open,
   onClose,
@@ -62,7 +118,12 @@ export function SettingsSheet({
   return (
     <Sheet open={open} title="Settings" onClose={onClose}>
       <div className="divide-y divide-white/10">
-        <div className="pb-3">
+        <RatingSelector
+          value={settings.rating}
+          onChange={(rating) => onChange({ ...settings, rating })}
+        />
+
+        <div className="py-3">
           <label htmlFor="max-mb" className="block text-sm text-white">
             Skip videos larger than
           </label>

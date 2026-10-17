@@ -1,5 +1,8 @@
 import type { MediaItem } from '../types'
 
+export type { RatingLevel } from './tagQuery'
+import type { RatingLevel } from './tagQuery'
+
 const K = {
   saved: 'danfeed.saved.v1',
   settings: 'danfeed.settings.v1',
@@ -10,11 +13,14 @@ export interface Settings {
   maxVideoMb: number
   /** Start with audio unmuted. */
   unmute: boolean
+  /** Which ratings the feed is allowed to show. Defaults to the safe one. */
+  rating: RatingLevel
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   maxVideoMb: 20,
   unmute: false,
+  rating: 'general',
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -35,8 +41,14 @@ function write(key: string, value: unknown) {
   }
 }
 
+const RATING_LEVELS: RatingLevel[] = ['general', 'sensitive', 'all']
+
 export function loadSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, ...read<Partial<Settings>>(K.settings, {}) }
+  const merged = { ...DEFAULT_SETTINGS, ...read<Partial<Settings>>(K.settings, {}) }
+  // Guard against a hand-edited or future value: an unknown rating must not leak the
+  // literal string "undefined" into the search, which would silently match nothing.
+  if (!RATING_LEVELS.includes(merged.rating)) merged.rating = DEFAULT_SETTINGS.rating
+  return merged
 }
 
 export function saveSettings(settings: Settings) {

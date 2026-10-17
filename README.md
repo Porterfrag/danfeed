@@ -32,8 +32,9 @@ Fix it with Secure DNS or a VPN:
 | Filter chips | All · Videos · Photos · Animated · Top |
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
+| Rating | Safe by default; Moderate/Everything opt-in per browser (see below) |
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
-| Settings | Video size cap, start-with-sound, reset history |
+| Settings | Content rating, video size cap, start-with-sound, reset history |
 | Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save |
 
 ## Tag autocomplete
@@ -95,6 +96,38 @@ Two consequences worth knowing:
 `verify-limit.ts` cross-checks this table against the live API with `npm run verify:limit`,
 and refuses to report success unless it actually reached the server.
 
+## Content rating
+
+The feed opens on `rating:general` so a shared link shows safe content by default. Settings offers
+three levels, stored per-browser in `localStorage`:
+
+| Level | Tag sent |
+| --- | --- |
+| Safe *(default)* | `rating:general` |
+| Moderate | `rating:general,sensitive` |
+| Everything | *(nothing)* |
+
+A comma inside the value is an OR, so Moderate returns both ratings rather than neither. Everything
+emits no rating tag at all, which is equivalent to listing all four — every post already carries one.
+
+`rating:` is a free metatag, so the default filter does **not** eat a search slot. Verified: the
+full home query is just `rating:general`, and `rating:general video chun-li` still returns results
+while `rating:general 1girl solo chun-li` correctly trips the limit. A whole feed of safe content
+therefore costs nothing in search power.
+
+**Typing your own rating wins.** If the query contains any `rating:` token — including a negation
+like `-rating:explicit` — the app drops its own default. This is not a nicety, it is required:
+Danbooru ANDs repeated metatags, so `rating:general rating:explicit` matches **zero** posts rather
+than falling through to explicit. Searching `rating:explicit` is the escape hatch for anyone who
+wants one specific rating, and it stays within the tag limit because the metatag is free.
+
+Two smaller details:
+
+- The gear icon carries an amber dot whenever the feed is allowed past general, so an unfiltered
+  feed is never a surprise after the setting was forgotten.
+- A hand-edited `localStorage` value that is not one of the three levels is coerced back to
+  `general`, so an unknown value cannot leak the literal string `undefined` into the search.
+
 ## How media is resolved
 
 Danbooru exposes a `media_asset.variants` array per post, which drives the whole renderer:
@@ -122,7 +155,7 @@ if you zoom.
 ```
 src/
   lib/danbooru.ts     API client, cursor paging, tag autocomplete, URL resolver
-  lib/tagQuery.ts     which tags consume a search slot; add/remove helpers
+  lib/tagQuery.ts     slot classification, rating levels, tag assembly
   lib/tagInput.ts     which word is being typed; how to apply a suggestion
   lib/store.ts        localStorage: saved / settings
   lib/useZoom.ts      pinch + double-tap zoom for still images

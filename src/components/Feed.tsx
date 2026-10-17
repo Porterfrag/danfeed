@@ -35,6 +35,8 @@ interface Props {
   onSavedClick: () => void
   onSettingsClick: () => void
   onHomeClick: () => void
+  /** True when the feed is allowed past the general rating. Drives the settings badge. */
+  nsfw: boolean
 }
 
 export function Feed({
@@ -62,6 +64,7 @@ export function Feed({
   onSavedClick,
   onSettingsClick,
   onHomeClick,
+  nsfw,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -215,10 +218,15 @@ export function Feed({
             <button
               type="button"
               onClick={onSettingsClick}
-              aria-label="Settings"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
+              aria-label={
+                nsfw ? 'Settings — unfiltered content is on' : 'Settings'
+              }
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
             >
               <IconGear className="h-4 w-4" />
+              {nsfw && (
+                <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-black bg-amber-400" />
+              )}
             </button>
           </div>
 

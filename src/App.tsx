@@ -11,9 +11,9 @@ import type { Settings } from './lib/store'
 type SheetName = 'add' | 'saved' | 'settings' | null
 
 export default function App() {
-  const feed = useFeed()
-  const { resetToDefault } = feed
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
+  const feed = useFeed(settings.rating)
+  const { resetToDefault } = feed
   const [saved, setSaved] = useState<MediaItem[]>(() => loadSaved())
   const [extras, setExtras] = useState<MediaItem[]>([])
   const [sheet, setSheet] = useState<SheetName>(null)
@@ -93,6 +93,7 @@ export default function App() {
         onSavedClick={() => setSheet('saved')}
         onSettingsClick={() => setSheet('settings')}
         onHomeClick={goHome}
+        nsfw={settings.rating !== 'general'}
       />
 
       <AddUrlSheet

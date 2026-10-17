@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaItem } from '../types'
 import { BooruError, searchPosts } from '../lib/danbooru'
-import { analyzeTags, removeToken, TAG_LIMIT, tokenize } from '../lib/tagQuery'
+import { analyzeTags, buildTags, removeToken, TAG_LIMIT, tokenize } from '../lib/tagQuery'
+import type { RatingLevel } from '../lib/tagQuery'
 
 export const CHIPS = [
   { id: 'all', label: 'All', tags: '' },
@@ -28,7 +29,7 @@ const PAGE_SIZE = 20
 /** Keep paginating until we have something new, so a heavy "seen" history never stalls the feed. */
 const MAX_SCAN_PAGES = 6
 
-export function useFeed() {
+export function useFeed(rating: RatingLevel) {
   const [chip, setChip] = useState<ChipId>('all')
   const [queryInput, setQueryInput] = useState('')
   const [query, setQuery] = useState('')
@@ -52,8 +53,8 @@ export function useFeed() {
   const chipTags = useMemo(() => CHIPS.find((c) => c.id === chip)?.tags ?? '', [chip])
 
   const tags = useMemo(
-    () => [chipTags, query].filter(Boolean).join(' '),
-    [chipTags, query],
+    () => buildTags({ rating, chipTags, query }),
+    [rating, chipTags, query],
   )
 
   const tagsRef = useRef(tags)

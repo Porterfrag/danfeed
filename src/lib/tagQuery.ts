@@ -63,3 +63,46 @@ export function removeToken(query: string, raw: string): string {
   parts.splice(index, 1)
   return parts.join(' ')
 }
+
+/* ------------------------------------------------------------------ */
+/* Rating filter                                                       */
+/* ------------------------------------------------------------------ */
+
+export type RatingLevel = 'general' | 'sensitive' | 'all'
+
+/**
+ * `rating:` is a free metatag (verified: it does not consume a search slot), and a
+ * comma-joined value is an OR. `all` deliberately emits nothing — every post already
+ * carries one of the four ratings, so an absent filter is equivalent to listing them.
+ */
+export const RATING_TAGS: Record<RatingLevel, string> = {
+  general: 'rating:general',
+  sensitive: 'rating:general,sensitive',
+  all: '',
+}
+
+/** True when the query sets its own rating, which must beat the app default. */
+export function hasRatingToken(query: string): boolean {
+  return tokenize(query).some((raw) => {
+    const colon = raw.indexOf(':')
+    if (colon <= 0) return false
+    return raw.slice(0, colon).replace(/^-/, '').toLowerCase() === 'rating'
+  })
+}
+
+/**
+ * Build the final tag string.
+ *
+ * The default rating is dropped as soon as the query carries its own, because
+ * Danbooru ANDs repeated metatags: `rating:general rating:explicit` matches
+ * nothing at all rather than falling through to explicit.
+ */
+export function buildTags(options: {
+  rating: RatingLevel
+  chipTags: string
+  query: string
+}): string {
+  const { rating, chipTags, query } = options
+  const base = hasRatingToken(query) ? '' : RATING_TAGS[rating]
+  return [base, chipTags, query].filter(Boolean).join(' ')
+}
