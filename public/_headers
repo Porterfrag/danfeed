@@ -13,6 +13,21 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
+# Brand assets keep stable names (index.html and the manifest point at fixed paths),
+# so they get a day rather than the immutable /assets rule. Replace an icon and it
+# can take a day for every visitor to see it.
+/favicon-32.png
+  Cache-Control: public, max-age=86400
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400
+
+/icon-*.png
+  Cache-Control: public, max-age=86400
+
+/manifest.webmanifest
+  Cache-Control: public, max-age=86400
+
 # Baseline hardening.
 #
 # Deliberately no Content-Security-Policy: the app pulls images and video from

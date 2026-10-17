@@ -215,6 +215,8 @@ if you zoom.
 
 ```
 src/
+  logo.jpg            the source artwork (not shipped) — see "The logo" below
+  assets/logo-mark.jpg a 160px crop of the above: the header mark and the splash
   lib/danbooru.ts     API client, cursor paging, tag autocomplete, URL resolver, tag labels
   lib/tagQuery.ts     slot classification, rating levels, tag assembly
   lib/tagCategories.ts the five tag families, their colours, and which tags are in each
@@ -236,7 +238,34 @@ src/
 
 public/
   _headers              Cloudflare Pages cache + security headers
+  favicon-32.png        tab icon: the mark in a dark rounded square
+  apple-touch-icon.png  180px home-screen icon
+  icon-192.png          192px icon referenced by the manifest
+  icon-512.png          512px icon referenced by the manifest
+  manifest.webmanifest  name, colours and icons for "Add to Home screen"
 ```
+
+## The logo
+
+`src/logo.jpg` is the source artwork (1536×1536 on a uniform `#FEFEFE` background). Everything the
+app ships is a crop of it around the head, extended up to include the crown and the ahoge. The
+hand-lettered "Danfeed" along the bottom of the source is not used: it is unreadable at the sizes
+the app needs, and the name is set in type wherever the app shows it.
+
+| File | Size | Notes |
+| --- | --- | --- |
+| `src/assets/logo-mark.jpg` | 160×160, 12.7 KB | drawn through `rounded-full`, so the circle needs no alpha channel — the equivalent PNG is ~60 KB |
+| `public/favicon-32.png` | 32×32, 2.3 KB | the mark inside a dark rounded square, so it reads on light and dark tab bars alike. The only brand byte an ordinary visit pays for |
+| `public/apple-touch-icon.png` | 180×180 | iOS home screen |
+| `public/icon-192.png`, `public/icon-512.png` | | Android home screen, via the manifest |
+
+The badge fills its whole canvas and insets the mark to 78%, so the launcher can apply its own mask
+(or not) without clipping the character.
+
+The header shows the mark alone; the "danfeed" wordmark returns from 640px (`sm`) up. On a phone the
+two together cost 57px of search box, which at 360px wide left 37px for a placeholder that needs
+81px — so the mark stands alone there, and the search box ends up 23px wider than before the logo
+existed.
 
 ## Build
 

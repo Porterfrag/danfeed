@@ -3,6 +3,7 @@ import type { MediaItem } from '../types'
 import type { BooruError } from '../lib/danbooru'
 import { CHIPS } from '../hooks/useFeed'
 import type { ChipId } from '../hooks/useFeed'
+import logoMark from '../assets/logo-mark.jpg'
 import { PostView } from './PostView'
 import { TagSearch } from './TagSearch'
 import { TagLimitNotice } from './TagLimitNotice'
@@ -200,9 +201,20 @@ export function Feed({
               onClick={onHomeClick}
               aria-label="danfeed — back to the default feed"
               title="Back to the default feed"
-              className="-ml-1 shrink-0 rounded-lg px-1.5 py-1 text-sm font-bold tracking-tight transition hover:bg-white/10 active:scale-95"
+              className="-ml-1 flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm font-bold tracking-tight transition hover:bg-white/10 active:scale-95"
             >
-              danfeed
+              <img
+                src={logoMark}
+                alt=""
+                width={28}
+                height={28}
+                draggable={false}
+                decoding="async"
+                className="h-7 w-7 rounded-full bg-white/10 object-cover select-none"
+              />
+              {/* The wordmark only appears where there is room for it: on a phone it
+                  would squeeze the search box below its placeholder. */}
+              <span className="hidden sm:inline">danfeed</span>
             </button>
 
             <TagSearch value={queryInput} onChange={setQueryInput} />
@@ -259,7 +271,19 @@ export function Feed({
 
       {/* First-load spinner */}
       {loading && items.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-5">
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src={logoMark}
+              alt=""
+              width={64}
+              height={64}
+              draggable={false}
+              decoding="async"
+              className="h-16 w-16 rounded-full opacity-90 select-none"
+            />
+            <p className="text-lg font-bold tracking-tight text-white/90">danfeed</p>
+          </div>
           <div className="df-spin h-7 w-7 rounded-full border-2 border-white/25 border-t-white" />
         </div>
       )}
