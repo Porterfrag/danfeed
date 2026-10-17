@@ -4,7 +4,7 @@
  * A mismatch means classifyToken() would either block a valid search or let
  * a doomed one through.
  */
-import { analyzeTags, TAG_LIMIT } from './src/lib/tagQuery.ts'
+import { analyzeTags, TAG_LIMIT } from '../src/lib/tagQuery.ts'
 
 const API = 'https://danbooru.donmai.us'
 const RESOLVE = { host: 'danbooru.donmai.us', ip: '104.26.11.39' }

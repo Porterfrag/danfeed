@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test:e2e": "node tests/run.mjs",
     "verify": "npm run lint && npm run test:e2e",
-    "verify:limit": "jiti verify-limit.ts",
+    "verify:limit": "jiti scripts/verify-limit.ts",
     "shots": "node tests/screenshots.mjs"
   },
   "dependencies": {
