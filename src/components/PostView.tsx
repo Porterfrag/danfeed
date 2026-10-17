@@ -28,6 +28,12 @@ interface Props {
   saved: boolean
   muted: boolean
   maxBytes: number
+  /**
+   * True once the chrome has been left alone for a while. The label and the rail step back to a
+   * quarter — never away: which tags a post carries is the point of the app, so it waits rather
+   * than hides, and any touch brings it back.
+   */
+  quiet: boolean
   onSave: (item: MediaItem) => void
   onToggleMute: () => void
   /** Search one tag, whichever category it belongs to. */
@@ -81,10 +87,10 @@ function MoreTags({ count, onClick }: { count: number; onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Show all tags"
-      className="relative flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2 py-1 text-[11px] font-medium text-white/60 ring-1 ring-inset ring-white/15 backdrop-blur-md transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/20 hover:text-white/90 active:scale-95"
+      className="relative flex shrink-0 items-center gap-0.5 rounded-[5px] bg-white/[0.07] px-1.5 py-1 font-mono text-2xs text-white/55 ring-1 ring-inset ring-white/10 transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/15 hover:text-white/90 active:scale-95"
     >
       +{count}
-      <IconChevronRight className="h-3 w-3 shrink-0" />
+      <IconChevronRight className="h-3.5 w-3.5 shrink-0" />
     </button>
   )
 }
@@ -97,11 +103,26 @@ const RATING_LABEL: Record<string, string> = {
 }
 
 const RATING_STYLE: Record<string, string> = {
-  g: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
-  s: 'bg-amber-500/15 text-amber-300 ring-amber-400/30',
-  q: 'bg-orange-500/15 text-orange-300 ring-orange-400/30',
-  e: 'bg-rose-500/15 text-rose-300 ring-rose-400/30',
+  g: 'bg-emerald-400/10 text-emerald-300/90 ring-emerald-300/25',
+  s: 'bg-amber-400/10 text-amber-300/90 ring-amber-300/25',
+  q: 'bg-orange-400/10 text-orange-300/90 ring-orange-300/25',
+  e: 'bg-rose-400/10 text-rose-300/90 ring-rose-300/25',
 }
+
+/**
+ * The rail: 44px targets, thin strokes, no glass.
+ *
+ * The scrim under the artwork already darkens the corner they sit in, so the buttons only have to
+ * stay visible on a bright picture — a soft black disc does that without the blur pass that
+ * `backdrop-filter` costs on the phones this is built for.
+ *
+ * The disc colour is applied per button rather than in the shared part: the saved button has to be
+ * able to turn white, and two background utilities on one element would leave the winner up to the
+ * order Tailwind happens to emit them in.
+ */
+const RAIL_BASE =
+  'flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-white/10 transition active:scale-90'
+const RAIL = `${RAIL_BASE} bg-black/35 text-white`
 
 function formatBytes(bytes?: number) {
   if (!bytes) return ''
@@ -134,6 +155,7 @@ export function PostView({
   saved,
   muted,
   maxBytes,
+  quiet,
   onSave,
   onToggleMute,
   onTagClick,
@@ -157,6 +179,9 @@ export function PostView({
   const [progress, setProgress] = useState(0)
   /** Bumped to point the element at a fresh URL. See `retryUrl`. */
   const [attempt, setAttempt] = useState(0)
+  /** The bookmark's one-shot settle. */
+  const [pop, setPop] = useState(false)
+  const firstSave = useRef(true)
   const retried = useRef(false)
   const retryTimer = useRef<number | null>(null)
   const reduced = useReducedMotion()
@@ -227,6 +252,27 @@ export function PostView({
   )
 
   const mediaSrc = attempt > 0 ? retryUrl(item.src, attempt) : item.src
+
+  /**
+   * Which URL has finished loading, by identity rather than a boolean.
+   *
+   * The fade is on exactly while the URL in the element has not loaded yet, so a retry (a new URL)
+   * starts over from the preview without an effect resetting anything.
+   */
+  const [readySrc, setReadySrc] = useState<string | null>(null)
+  const ready = readySrc === mediaSrc
+
+  // The bookmark settles when it is filled, not when an already-saved post scrolls back into view.
+  useEffect(() => {
+    if (!saved) return
+    if (firstSave.current) {
+      firstSave.current = false
+      return
+    }
+    setPop(true)
+    const timer = window.setTimeout(() => setPop(false), 260)
+    return () => window.clearTimeout(timer)
+  }, [saved])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -347,13 +393,16 @@ export function PostView({
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {/* Ambient backdrop so portrait/landscape media never sits on flat black. */}
+      {/* The preview, blurred: ambience for a picture that does not fit the screen, and the
+          thing the media sharpens out of while it loads — brighter until it does. */}
       {item.poster && (
         <img
           src={item.poster}
           alt=""
           aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
+          className={`pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl transition-opacity duration-500 motion-reduce:transition-none ${
+            ready ? 'opacity-25' : 'opacity-45'
+          }`}
         />
       )}
 
@@ -442,8 +491,15 @@ export function PostView({
             draggable={false}
             loading={distance <= 3 ? 'eager' : 'lazy'}
             decoding="async"
+            ref={(el) => {
+              // A cached image can be complete before React's onLoad is attached.
+              if (el && el.complete && el.naturalWidth > 0) setReadySrc(mediaSrc)
+            }}
+            onLoad={() => setReadySrc(mediaSrc)}
             onError={handleMediaError}
-            className="max-h-full max-w-full select-none object-contain"
+            className={`max-h-full max-w-full select-none object-contain transition-opacity duration-300 motion-reduce:transition-none ${
+              ready ? 'opacity-100' : 'opacity-0'
+            }`}
             style={{
               transform: `translate3d(${zoom.state.x}px, ${zoom.state.y}px, 0) scale(${zoom.state.s})`,
               transition: zoom.dragging || reduced ? 'none' : 'transform 180ms ease-out',
@@ -455,7 +511,7 @@ export function PostView({
       {/* Paused affordance */}
       {isVideo && paused && !failed && !gated && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <div className="rounded-full bg-black/45 p-4 backdrop-blur-sm">
+          <div className="rounded-full bg-black/50 p-4">
             <IconPlay className="h-8 w-8 text-white/90" />
           </div>
         </div>
@@ -465,12 +521,17 @@ export function PostView({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-64 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-gradient-to-b from-black/70 to-transparent" />
 
-      {/* Meta */}
-      <div className="absolute bottom-8 left-3 z-20 max-w-[calc(100%-5rem)]">
+      {/* Meta. Steps back to a quarter when the chrome has been left alone — see `quiet` — and
+          settles up when the slide comes to rest, the way a caption arrives with a picture. */}
+      <div
+        className={`absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] left-3 z-20 max-w-[calc(100%-5rem)] transition-opacity duration-500 motion-reduce:transition-none ${
+          quiet ? 'opacity-25' : 'opacity-100'
+        } ${active ? 'df-settle' : ''}`}
+      >
         {/* Browsable entity tags. Tapping one searches that exact tag, so the feed
             becomes "everything else with this artist / character / series". */}
         {entityChips.length > 0 && (
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             {entityChips.map((chip) => (
               <TagChip
                 key={chip.key}
@@ -512,32 +573,36 @@ export function PostView({
           )}
         </div>
 
-        <div className="mt-2 flex items-center gap-2 text-[11px] text-white/60">
+        <div className="mt-2 flex items-center gap-2 font-mono text-2xs text-white/55">
           {typeof item.score === 'number' && <span>♥ {item.score}</span>}
           {rating && RATING_LABEL[rating] && (
             <span
-              className={`rounded-full px-2 py-0.5 font-medium ring-1 ring-inset ${
-                RATING_STYLE[rating] ?? 'bg-white/10 text-white/70 ring-white/20'
+              className={`rounded-[4px] px-1.5 py-px tracking-wide ring-1 ring-inset ${
+                RATING_STYLE[rating] ?? 'bg-white/5 text-white/60 ring-white/15'
               }`}
             >
               {RATING_LABEL[rating]}
             </span>
           )}
           {item.postId && <span className="tabular-nums">#{item.postId}</span>}
-          {item.origin === 'custom' && <span className="text-white/40">custom</span>}
+          {item.origin === 'custom' && <span className="text-white/35">custom</span>}
         </div>
       </div>
 
       {/* Actions */}
-      <div className="absolute bottom-8 right-2 z-20 flex flex-col items-center gap-3">
+      <div
+        className={`absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] right-2 z-20 flex flex-col items-center gap-3 transition-opacity duration-500 motion-reduce:transition-none ${
+          quiet ? 'opacity-25' : 'opacity-100'
+        }`}
+      >
         <button
           type="button"
           onClick={() => onSave(item)}
           aria-label={saved ? 'Remove from saved' : 'Save'}
           aria-pressed={saved}
-          className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md transition ${
-            saved ? 'bg-white text-black' : 'bg-black/40 text-white'
-          }`}
+          className={`${RAIL_BASE} ${
+            saved ? 'bg-white text-black ring-transparent' : 'bg-black/35 text-white'
+          } ${pop ? 'df-pop' : ''}`}
         >
           <IconBookmark filled={saved} />
         </button>
@@ -547,7 +612,7 @@ export function PostView({
             type="button"
             onClick={onToggleMute}
             aria-label={muted ? 'Unmute' : 'Mute'}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+            className={RAIL}
           >
             {muted ? <IconVolumeOff /> : <IconVolumeOn />}
           </button>
@@ -559,7 +624,7 @@ export function PostView({
             onClick={() => onRelated(subject)}
             aria-label="More like this"
             title={`Tags that go with ${tagLabel(subject.tag)}`}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+            className={RAIL}
           >
             <IconCompass />
           </button>
@@ -569,7 +634,7 @@ export function PostView({
           type="button"
           onClick={() => onShare(item)}
           aria-label="Share"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+          className={RAIL}
         >
           <IconShare />
         </button>
@@ -580,7 +645,7 @@ export function PostView({
             target="_blank"
             rel="noreferrer"
             aria-label="Open original"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+            className={RAIL}
           >
             <IconExternal />
           </a>

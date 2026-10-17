@@ -1,8 +1,26 @@
 @import 'tailwindcss';
 
+/*
+ * Tokens first.
+ *
+ * Four sizes (11 / 13 / 15 / 20) and two weights, so the app has a scale instead of a decision
+ * per component. Tags and queries are code — `blue_dress`, `score:>200`, `id:<1234` — so they are
+ * set in the system mono face, the one typographic choice the app makes for itself.
+ */
 @theme {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-2xs: 0.6875rem; /* 11px — edge codes, post ids, stamps */
+  --text-2xs--line-height: 1.5;
+  --text-xs: 0.8125rem; /* 13px — chips, rows, secondary copy */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9375rem; /* 15px — the gallery label, body copy */
+  --text-sm--line-height: 1.5;
+  --text-lg: 1.25rem; /* 20px — the wordmark, sheet weight */
+  --text-lg--line-height: 1.3;
 }
 
 html,
@@ -20,11 +38,38 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/*
+ * One focus ring, drawn by the stylesheet.
+ *
+ * Colour is never the only sign of focus, and the ring is the same everywhere, so a keyboard user
+ * learns it once. Components that paint their own ring can still override this.
+ */
+:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.75);
+  outline-offset: 2px;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* The same idea for the sheets: a scrollbar is a fact, but it should not be the loudest pixel. */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+}
+.scroll-quiet::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-quiet::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.16);
+}
+.scroll-quiet::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .safe-b {
@@ -37,7 +82,7 @@ body {
 @keyframes df-fade-up {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -45,7 +90,7 @@ body {
   }
 }
 .df-fade-up {
-  animation: df-fade-up 180ms ease-out both;
+  animation: df-fade-up 220ms ease-out both;
 }
 
 @keyframes df-fade-in {
@@ -60,6 +105,25 @@ body {
   animation: df-fade-in 150ms ease-out both;
 }
 
+/*
+ * The invitation to look, and the settle when the new slide comes to rest.
+ *
+ * `df-settle` moves and does not fade, on purpose: it is applied to the same element that carries
+ * the quiet state, and a keyframe holding `opacity: 1` would win over that class for as long as the
+ * animation kept filling. Transform alone has nothing to fight with.
+ */
+@keyframes df-settle {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: none;
+  }
+}
+.df-settle {
+  animation: df-settle 200ms ease-out both;
+}
+
 @keyframes df-spin {
   to {
     transform: rotate(360deg);
@@ -70,16 +134,37 @@ body {
 }
 
 /*
+ * Saving is the app's one delight: the bookmark settles a touch past its size and comes back.
+ * Everything else stays still, which is what makes this read as a response rather than decoration.
+ */
+@keyframes df-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.df-pop {
+  animation: df-pop 220ms ease-out;
+}
+
+/*
  * Less motion, asked for at the system level.
  *
- * The fades and the sheet's slide-up are decoration, so they go. The spinner keeps its shape and
- * loses its rotation — "loading" still has to be visible, it just does not have to spin.
- * Scrolling and video autoplay are handled in the components, where they can be tied to the
+ * The fades, the sheet's slide-up and the save pop are decoration, so they go. The spinner keeps
+ * its shape and loses its rotation — "loading" still has to be visible, it just does not have to
+ * spin. Scrolling and video autoplay are handled in the components, where they can be tied to the
  * setting as it changes rather than to a rule that only the stylesheet can see.
  */
 @media (prefers-reduced-motion: reduce) {
   .df-fade-up,
-  .df-fade-in {
+  .df-fade-in,
+  .df-pop,
+  .df-settle {
     animation: none;
   }
   .df-spin {

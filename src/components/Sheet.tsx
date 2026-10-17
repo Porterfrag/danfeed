@@ -102,7 +102,7 @@ export function Sheet({ open, title, onClose, children }: Props) {
         aria-hidden="true"
         tabIndex={-1}
         onClick={onClose}
-        className="df-fade-in absolute inset-0 cursor-default bg-black/65 backdrop-blur-sm"
+        className="df-fade-in absolute inset-0 cursor-default bg-black/60"
       />
       <div
         ref={panelRef}
@@ -111,7 +111,7 @@ export function Sheet({ open, title, onClose, children }: Props) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onPanelKeyDown}
-        className="df-fade-up safe-b relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-neutral-900 p-4 pb-6 shadow-2xl outline-none sm:rounded-2xl"
+        className="df-fade-up scroll-quiet safe-b relative max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-neutral-900 p-4 pb-6 shadow-2xl outline-none sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 id={titleId} className="text-base font-semibold text-white">

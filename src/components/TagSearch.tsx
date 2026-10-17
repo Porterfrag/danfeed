@@ -263,7 +263,7 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
         aria-expanded={open || showRecents}
         aria-autocomplete="list"
         aria-controls="tag-suggestions"
-        className="h-9 w-full rounded-full border border-white/10 bg-white/10 pl-8 pr-8 text-sm text-white placeholder:text-white/40 focus:border-white/25 focus:outline-none"
+        className="h-9 w-full rounded-full border border-white/10 bg-white/[0.07] pl-8 pr-8 font-mono text-sm text-white placeholder:font-sans placeholder:text-white/40 focus:border-white/25 focus:outline-none"
       />
 
       {loading && (
@@ -271,7 +271,7 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
       )}
 
       {showEmpty && (
-        <p className="absolute left-0 right-0 top-full mt-1 rounded-xl border border-white/10 bg-neutral-900/95 px-3 py-2 text-[11px] text-white/40 backdrop-blur-md">
+        <p className="absolute left-0 right-0 top-full mt-1 rounded-xl border border-white/10 bg-neutral-900 px-3 py-2 text-2xs text-white/40">
           No tag matches “{query}”
         </p>
       )}
@@ -281,7 +281,7 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
           ref={listRef}
           id="tag-suggestions"
           role="listbox"
-          className="df-fade-in absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900/95 py-1 shadow-2xl backdrop-blur-md"
+          className="df-fade-in scroll-quiet absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 py-1 shadow-2xl"
         >
           {items.map((tag, index) => {
             const cat = categorySpec(tag.category)
@@ -299,15 +299,15 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
                   index === highlight ? 'bg-white/12' : 'hover:bg-white/8'
                 }`}
               >
-                <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-white/90">
                   {tag.label}
                 </span>
                 <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cat.badge}`}
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium ${cat.badge}`}
                 >
                   {cat.label}
                 </span>
-                <span className="w-10 shrink-0 text-right text-[10px] tabular-nums text-white/30">
+                <span className="w-10 shrink-0 text-right font-mono text-2xs tabular-nums text-white/30">
                   {formatCount(tag.postCount)}
                 </span>
               </button>
@@ -317,9 +317,9 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
       )}
 
       {showRecents && (
-        <div className="df-fade-in absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-md">
+        <div className="df-fade-in absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-white/10 bg-neutral-900 shadow-2xl">
           <div className="flex items-center justify-between px-2.5 pb-1 pt-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-white/35">
+            <span className="text-2xs font-medium uppercase tracking-wide text-white/35">
               Recent
             </span>
             <button
@@ -330,7 +330,7 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
                 onClearRecents()
                 setRecentsHidden(true)
               }}
-              className="text-[10px] text-white/45 transition hover:text-white/80"
+              className="text-2xs text-white/45 transition hover:text-white/80"
             >
               Clear
             </button>
@@ -345,10 +345,10 @@ export function TagSearch({ value, onChange, recents, onClearRecents, focusSigna
                 aria-label={`Recent search ${entry}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pickRecent(entry)}
-                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition hover:bg-white/8"
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition hover:bg-white/10"
               >
                 <IconHistory className="h-3.5 w-3.5 shrink-0 text-white/30" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{entry}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-white/90">{entry}</span>
               </button>
             ))}
           </div>

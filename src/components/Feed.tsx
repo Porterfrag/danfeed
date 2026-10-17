@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MediaItem } from '../types'
 import type { BooruError } from '../lib/danbooru'
 import { announce } from '../lib/announce'
@@ -56,6 +56,12 @@ interface Props {
   shortcutsEnabled: boolean
   /** True when the feed is allowed past the general rating. Drives the settings badge. */
   nsfw: boolean
+  /**
+   * The mode, when it is not the safe one: a stamped `M` or `E` next to the wordmark. The same
+   * fact as the badge on the gear, said in the app's own voice — the settings screen calls the
+   * levels Moderate and Everything, so the stamp does too.
+   */
+  ratingMark: 'M' | 'E' | null
   /** Past searches, newest first, for the box's history panel. */
   recents: string[]
   onClearRecents: () => void
@@ -72,6 +78,14 @@ interface Props {
 
 /** Slides left before the next page is asked for. See the effect below. */
 const PREFETCH_AHEAD = 3
+
+/**
+ * How long the chrome stays at full strength after the last touch.
+ *
+ * Long enough to read a label without hurrying, short enough that a video gets the screen back
+ * while it is still playing.
+ */
+const QUIET_AFTER_MS = 4000
 
 export function Feed({
   items,
@@ -99,6 +113,7 @@ export function Feed({
   onSettingsClick,
   onHomeClick,
   nsfw,
+  ratingMark,
   onTagClick,
   onTagActions,
   onShowAllTags,
@@ -117,6 +132,36 @@ export function Feed({
   const [focusSignal, setFocusSignal] = useState(0)
   const reduced = useReducedMotion()
 
+  /**
+   * The chrome that steps back.
+   *
+   * Four seconds after the last touch, the label and the rail drop to a quarter strength and wait
+   * there. Nothing is hidden — the tags are the point of the app, so they stay legible — but the
+   * artwork stops competing with its own metadata. Any pointer, key or wheel brings them back, and
+   * so does a new slide arriving.
+   */
+  const [quiet, setQuiet] = useState(false)
+  const quietTimer = useRef<number | null>(null)
+  /** Restart the countdown; the chrome comes back the moment anything happens. */
+  const arm = useCallback(() => {
+    if (quietTimer.current !== null) window.clearTimeout(quietTimer.current)
+    quietTimer.current = window.setTimeout(() => setQuiet(true), QUIET_AFTER_MS)
+  }, [])
+  const wake = useCallback(() => {
+    setQuiet(false)
+    arm()
+  }, [arm])
+
+  useEffect(() => {
+    arm()
+    const events = ['pointerdown', 'keydown', 'wheel'] as const
+    events.forEach((name) => window.addEventListener(name, wake, { passive: true }))
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, wake))
+      if (quietTimer.current !== null) window.clearTimeout(quietTimer.current)
+    }
+  }, [arm, wake])
+
   // Which slide owns the screen decides who plays.
   useEffect(() => {
     const root = scrollerRef.current
@@ -132,14 +177,18 @@ export function Feed({
             best = Number((entry.target as HTMLElement).dataset.index)
           }
         }
-        if (best >= 0 && bestRatio >= 0.55) setActive(best)
+        if (best >= 0 && bestRatio >= 0.55) {
+          setActive(best)
+          // A slide that has just come to rest gets the chrome back in full.
+          wake()
+        }
       },
       { root, threshold: [0.55] },
     )
 
     root.querySelectorAll<HTMLElement>('[data-slide]').forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-  }, [items.length])
+  }, [items.length, wake])
 
   // Infinite scroll.
   useEffect(() => {
@@ -325,6 +374,7 @@ export function Feed({
                 saved={savedKeys.has(item.key)}
                 muted={muted}
                 maxBytes={maxBytes}
+                quiet={quiet}
                 onSave={onSave}
                 onToggleMute={onToggleMute}
                 onTagClick={onTagClick}
@@ -362,6 +412,16 @@ export function Feed({
               {/* The wordmark only appears where there is room for it: on a phone it
                   would squeeze the search box below its placeholder. */}
               <span className="hidden sm:inline">danfeed</span>
+              {ratingMark && (
+                <span
+                  title={
+                    ratingMark === 'E' ? 'Everything is on' : 'Moderate is on'
+                  }
+                  className="hidden rounded-[4px] border border-amber-300/40 px-1 font-mono text-2xs font-semibold tracking-widest text-amber-300 sm:inline"
+                >
+                  {ratingMark}
+                </span>
+              )}
             </button>
 
             <TagSearch
@@ -376,7 +436,7 @@ export function Feed({
               type="button"
               onClick={onAddClick}
               aria-label="Add a URL"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-black transition active:scale-90"
             >
               <IconPlus className="h-4 w-4" />
             </button>
@@ -384,7 +444,7 @@ export function Feed({
               type="button"
               onClick={onSavedClick}
               aria-label="Saved"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/15 active:scale-90"
             >
               <IconBookmark className="h-4 w-4" />
             </button>
@@ -394,7 +454,7 @@ export function Feed({
               aria-label={
                 nsfw ? 'Settings — unfiltered content is on' : 'Settings'
               }
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/15 active:scale-90"
             >
               <IconGear className="h-4 w-4" />
               {nsfw && (
@@ -408,7 +468,7 @@ export function Feed({
               onClick={onShowShortcuts}
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts"
-              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white sm:flex"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/15 active:scale-90 sm:flex"
             >
               <IconKeyboard className="h-4 w-4" />
             </button>
@@ -420,10 +480,10 @@ export function Feed({
                 key={option.id}
                 type="button"
                 onClick={() => setChip(option.id)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition active:scale-95 ${
                   chip === option.id
                     ? 'bg-white text-black'
-                    : 'bg-white/10 text-white/75 hover:bg-white/15'
+                    : 'bg-white/[0.08] text-white/70 ring-1 ring-inset ring-white/10 hover:bg-white/15 hover:text-white/90'
                 }`}
               >
                 {option.label}
@@ -473,7 +533,7 @@ export function Feed({
       {/* Soft failure: keep what we have, offer a retry */}
       {items.length > 0 && error && (
         <div className="safe-b absolute inset-x-3 bottom-16 z-40" role="status">
-          <div className="df-fade-up flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-500/15 p-3 backdrop-blur-md">
+          <div className="df-fade-up flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-500/15 p-3">
             <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <p className="flex-1 text-xs leading-relaxed text-amber-100">{error.message}</p>
             <button
@@ -512,10 +572,29 @@ export function Feed({
         </div>
       )}
 
-      {/* End-of-feed marker */}
+      {/* End-of-feed marker. The mascot marks the spot; the line echoes what was being looked
+          for, because "nothing older" means nothing without the query it refers to. */}
       {!hasMore && items.length > 0 && !loading && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 text-center text-[10px] uppercase tracking-widest text-white/30">
-          end of feed
+        <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex items-center justify-center gap-1.5 px-6">
+          <img
+            src={logoMark}
+            alt=""
+            aria-hidden
+            draggable={false}
+            decoding="async"
+            className="h-4 w-4 shrink-0 rounded-full opacity-30 select-none"
+          />
+          <span className="min-w-0 truncate text-2xs tracking-wide text-white/35">
+            nothing older
+            {queryInput.trim() ? (
+              <>
+                {' '}
+                for <span className="font-mono text-white/55">{queryInput.trim()}</span>
+              </>
+            ) : (
+              ' here'
+            )}
+          </span>
         </div>
       )}
     </div>

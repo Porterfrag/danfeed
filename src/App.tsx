@@ -295,6 +295,9 @@ export default function App() {
           onSettingsClick={() => setSheet('settings')}
           onHomeClick={goHome}
           nsfw={settings.rating !== 'general'}
+          ratingMark={
+            settings.rating === 'all' ? 'E' : settings.rating === 'sensitive' ? 'M' : null
+          }
           onTagClick={browseTag}
           onTagActions={setTagTarget}
           onShowAllTags={setTagsItem}

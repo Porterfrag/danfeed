@@ -1,6 +1,5 @@
 import { tagLabel } from '../lib/danbooru'
 import { useLongPress } from '../lib/useLongPress'
-import { IconChevronRight } from './icons'
 import type { TagTarget } from './TagActionsSheet'
 
 interface Props {
@@ -18,25 +17,50 @@ interface Props {
 }
 
 /**
- * Two looks, one behaviour. Entity chips carry the dot and the chevron because they are who or
- * what the post is; general tags stay quieter because they are descriptors.
- */
-const VARIANT = {
-  entity:
-    'flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-2 pr-1.5 ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 active:scale-95',
-  general:
-    "relative rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85 ring-1 ring-inset ring-white/15 backdrop-blur-md transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/20 active:scale-95",
-} as const
-
-/**
- * A tag on a slide: tap to search it, hold for the rest.
+ * Two looks, one behaviour.
  *
- * A component rather than markup in a loop because the hold is stateful — a hook per chip is
- * the only place that can live, and hooks cannot be called from a `.map` callback.
+ * Entity chips are the gallery label under the artwork: the artist first and brightest, then the
+ * character, then the series, each smaller or dimmer than the one before. They keep no pill of
+ * their own, so the frame stays the picture's and the order alone says what the post is.
+ *
+ * General tags are the film's edge printing: mono, small, square-cornered and quiet, because
+ * `blue_dress` is a code rather than a name. The row is one line either way.
  */
+const LABEL: Record<string, string> = {
+  artist: 'text-sm font-semibold text-white',
+  character: 'text-sm text-white/85',
+  series: 'text-xs text-white/60',
+}
+
 export function TagChip({ tag, kind, ariaPrefix, dot, variant, onTagClick, onTagActions }: Props) {
   const { holding, handlers } = useLongPress(() => onTagActions({ tag, kind }))
   const label = tagLabel(tag)
+
+  if (variant === 'general') {
+    return (
+      <button
+        type="button"
+        {...handlers}
+        onClick={(e) => {
+          handlers.onClick(e)
+          // The hold already opened the sheet; searching on top of it would be a request
+          // nobody asked for.
+          if (e.defaultPrevented) return
+          onTagClick(tag)
+        }}
+        aria-label={`${ariaPrefix} ${label}`}
+        aria-haspopup="dialog"
+        title="Hold or right-click for tag actions"
+        className={`relative rounded-[5px] px-2 py-1 font-mono text-2xs ring-1 ring-inset transition before:absolute before:-inset-1 before:content-[''] active:scale-95 ${
+          holding
+            ? 'scale-95 bg-white/15 text-white/90 ring-white/30'
+            : 'bg-white/[0.07] text-white/70 ring-white/10 hover:bg-white/15 hover:text-white/90'
+        }`}
+      >
+        #{tag}
+      </button>
+    )
+  }
 
   return (
     <button
@@ -44,25 +68,18 @@ export function TagChip({ tag, kind, ariaPrefix, dot, variant, onTagClick, onTag
       {...handlers}
       onClick={(e) => {
         handlers.onClick(e)
-        // The hold already opened the sheet; searching on top of it would be a request
-        // nobody asked for.
         if (e.defaultPrevented) return
         onTagClick(tag)
       }}
       aria-label={`${ariaPrefix} ${label}`}
       aria-haspopup="dialog"
       title="Hold or right-click for tag actions"
-      className={`${VARIANT[variant]}${holding ? ' scale-95 bg-white/25 ring-white/50' : ''}`}
+      className={`relative -mx-1 flex max-w-full items-center gap-1.5 rounded-lg px-1 py-0.5 transition before:absolute before:-inset-1 before:content-[''] ${
+        LABEL[kind ?? 'artist']
+      } ${holding ? 'bg-white/15' : 'hover:bg-white/10 active:opacity-70'}`}
     >
       {dot && <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />}
-      {variant === 'entity' ? (
-        <>
-          <span className="truncate text-[12px] font-semibold text-white">{label}</span>
-          <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-white/50" />
-        </>
-      ) : (
-        `#${tag}`
-      )}
+      <span className="truncate">{label}</span>
     </button>
   )
 }

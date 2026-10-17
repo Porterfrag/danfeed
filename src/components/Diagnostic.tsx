@@ -1,4 +1,5 @@
 import { BooruError } from '../lib/danbooru'
+import logoMark from '../assets/logo-mark.jpg'
 import { IconAlert, IconRefresh } from './icons'
 
 interface Props {
@@ -20,6 +21,19 @@ export function Diagnostic({ error, onRetry }: Props) {
   return (
     <div role="alert" className="flex h-full w-full items-center justify-center bg-black px-6">
       <div className="w-full max-w-md">
+        {/* The mascot, so the screen is still the app's even when nothing in it worked. */}
+        <div className="mb-5 flex items-center gap-2.5">
+          <img
+            src={logoMark}
+            alt=""
+            aria-hidden
+            draggable={false}
+            decoding="async"
+            className="h-12 w-12 rounded-full opacity-80 select-none"
+          />
+          <span className="font-mono text-2xs tracking-widest text-white/40">danfeed</span>
+        </div>
+
         <div className="mb-4 flex items-center gap-2 text-amber-300">
           <IconAlert className="h-5 w-5" />
           <span className="text-sm font-semibold">
