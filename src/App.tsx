@@ -60,11 +60,11 @@ export default function App() {
   }, [resetToDefault])
 
   /**
-   * Tapping an artist's chip searches that exact artist tag, so the feed becomes
-   * "everything by this artist" and the tag shows up in the search box — visible,
-   * editable and clearable rather than a hidden mode.
+   * Tapping a tag chip searches that exact tag, so the feed becomes "everything else
+   * with this artist / character / series" and the tag shows up in the search box —
+   * visible, editable and clearable rather than a hidden mode.
    */
-  const browseArtist = useCallback(
+  const browseTag = useCallback(
     (tag: string) => {
       setScrollSignal((n) => n + 1)
       searchTag(tag)
@@ -107,7 +107,7 @@ export default function App() {
         onSettingsClick={() => setSheet('settings')}
         onHomeClick={goHome}
         nsfw={settings.rating !== 'general'}
-        onArtistClick={browseArtist}
+        onTagClick={browseTag}
       />
 
       <AddUrlSheet

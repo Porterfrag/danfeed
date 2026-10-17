@@ -25,8 +25,13 @@ export interface DanbooruPost {
   rating?: string | null
   score?: number | null
   tag_string?: string | null
-  /** Space-separated artist tags. Note `tag_string` already includes these. */
+  /**
+   * Category-specific tag lists. Note `tag_string` already contains all of these,
+   * so anything shown from here must be filtered out of the generic tag row.
+   */
   tag_string_artist?: string | null
+  tag_string_character?: string | null
+  tag_string_copyright?: string | null
   media_asset?: MediaAsset | null
 }
 
@@ -43,11 +48,14 @@ export interface MediaItem {
   score?: number
   tags: string[]
   /**
-   * Artist tags, in canonical searchable form (`corn_kuten`, `anna_(k0130)`).
-   * Kept separate from `tags` because they are also *contained* in `tags` —
-   * the UI strips them from the generic tag chips so they are not shown twice.
+   * Browsable entity tags, in canonical searchable form (`corn_kuten`,
+   * `narita_taishin_(umamusume)`). Kept separate from `tags` because they are also
+   * *contained* in `tags` — the UI strips them from the generic `#tag` chips so they
+   * are not shown twice.
    */
   artists: string[]
+  characters: string[]
+  copyrights: string[]
   postId?: number
   sourceUrl?: string
   origin: 'danbooru' | 'custom'

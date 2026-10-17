@@ -16,6 +16,8 @@ const ONLY = [
   'score',
   'tag_string',
   'tag_string_artist',
+  'tag_string_character',
+  'tag_string_copyright',
   'media_asset',
 ].join(',')
 
@@ -136,6 +138,11 @@ function isWebm(url: string | null | undefined): url is string {
   return !!url && /\.webm(\?|#|$)/i.test(url)
 }
 
+/** Danbooru returns tag lists as one space-separated string, or "" when there are none. */
+function splitTags(value: string | null | undefined): string[] {
+  return value ? value.split(' ').filter(Boolean) : []
+}
+
 /**
  * Pick the best renderable source for a post.
  *
@@ -176,8 +183,12 @@ export function toItem(post: DanbooruPost): MediaItem | null {
     bytes: post.file_size ?? undefined,
     rating: post.rating ?? undefined,
     score: post.score ?? undefined,
-    tags: post.tag_string ? post.tag_string.split(' ').filter(Boolean) : [],
-    artists: post.tag_string_artist ? post.tag_string_artist.split(' ').filter(Boolean) : [],
+    // `tags` is every tag on the post; the category lists are what the UI makes
+    // browsable, and they are subtracted from `tags` before rendering.
+    tags: splitTags(post.tag_string),
+    artists: splitTags(post.tag_string_artist),
+    characters: splitTags(post.tag_string_character),
+    copyrights: splitTags(post.tag_string_copyright),
     postId: post.id,
     sourceUrl: `${API}/posts/${post.id}`,
     origin: 'danbooru',
@@ -287,40 +298,58 @@ export function tagLabel(tag: string): string {
 /* Custom URL resolution                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * A pasted URL has no Danbooru taxonomy at all, so every tag category is empty.
+ * Built in one place because there are four call sites and four empty arrays each.
+ */
+function customItem(
+  base: Pick<MediaItem, 'key' | 'kind' | 'src' | 'width' | 'height'>,
+  extra: Partial<MediaItem> = {},
+): MediaItem {
+  return {
+    tags: [],
+    artists: [],
+    characters: [],
+    copyrights: [],
+    ...base,
+    ...extra,
+    origin: 'custom',
+  }
+}
+
 function embedFor(url: string): MediaItem | null {
   const yt = url.match(
     /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/,
   )
   if (yt) {
     const id = yt[1]
-    return {
-      key: `youtube:${id}`,
-      kind: 'embed',
-      src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${id}&rel=0`,
-      width: 16,
-      height: 9,
-      tags: [],
-      artists: [],
-      origin: 'custom',
-      title: 'YouTube',
-      sourceUrl: `https://www.youtube.com/watch?v=${id}`,
-    }
+    return customItem(
+      {
+        key: `youtube:${id}`,
+        kind: 'embed',
+        src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${id}&rel=0`,
+        width: 16,
+        height: 9,
+      },
+      {
+        title: 'YouTube',
+        sourceUrl: `https://www.youtube.com/watch?v=${id}`,
+      },
+    )
   }
 
   const vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
   if (vimeo) {
-    return {
-      key: `vimeo:${vimeo[1]}`,
-      kind: 'embed',
-      src: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&muted=1&loop=1`,
-      width: 16,
-      height: 9,
-      tags: [],
-      artists: [],
-      origin: 'custom',
-      title: 'Vimeo',
-      sourceUrl: url,
-    }
+    return customItem(
+      {
+        key: `vimeo:${vimeo[1]}`,
+        kind: 'embed',
+        src: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&muted=1&loop=1`,
+        width: 16,
+        height: 9,
+      },
+      { title: 'Vimeo', sourceUrl: url },
+    )
   }
 
   return null
@@ -350,29 +379,23 @@ export async function resolveUrl(input: string): Promise<MediaItem> {
   if (embed) return embed
 
   if (VIDEO_RE.test(url)) {
-    return {
+    return customItem({
       key: `custom:${url}`,
       kind: 'video',
       src: url,
       width: 0,
       height: 0,
-      tags: [],
-      artists: [],
-      origin: 'custom',
-    }
+    })
   }
 
   if (IMAGE_RE.test(url)) {
-    return {
+    return customItem({
       key: `custom:${url}`,
       kind: /\.gif(\?|#|$)/i.test(url) ? 'gif' : 'photo',
       src: url,
       width: 0,
       height: 0,
-      tags: [],
-      artists: [],
-      origin: 'custom',
-    }
+    })
   }
 
   throw new BooruError(

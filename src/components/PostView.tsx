@@ -4,7 +4,6 @@ import type { MediaItem } from '../types'
 import { tagLabel } from '../lib/danbooru'
 import { useZoom } from '../lib/useZoom'
 import {
-  IconArtist,
   IconBookmark,
   IconChevronRight,
   IconExternal,
@@ -23,13 +22,49 @@ interface Props {
   maxBytes: number
   onSave: (item: MediaItem) => void
   onToggleMute: () => void
-  /** Browse everything by one artist tag. */
-  onArtistClick: (tag: string) => void
+  /** Search one tag, whichever category it belongs to. */
+  onTagClick: (tag: string) => void
 }
 
-/** Collaborations are rare; beyond a few chips the row would swallow the slide. */
-const MAX_ARTIST_CHIPS = 3
 const MAX_TAG_CHIPS = 5
+
+interface EntityKind {
+  key: 'artist' | 'character' | 'copyright'
+  read: (item: MediaItem) => string[]
+  /** Chips shown before the rest collapse into "+N". */
+  max: number
+  /** Dot colour, following Danbooru's own category colours. */
+  dot: string
+  aria: string
+}
+
+/**
+ * Browsable entity tags, in display order.
+ *
+ * The hues are Danbooru's own taxonomy — artist red, character green, copyright
+ * purple — so the row reads the way the site does.
+ *
+ * Each category is capped separately rather than capping the row as a whole. Group
+ * pictures routinely carry several characters, and a single shared cap would push the
+ * copyright off the slide entirely, which is the tag most likely to identify the work.
+ */
+const ENTITY_KINDS: EntityKind[] = [
+  { key: 'artist', read: (i) => i.artists, max: 2, dot: 'bg-red-400', aria: 'Show more by artist' },
+  {
+    key: 'character',
+    read: (i) => i.characters,
+    max: 2,
+    dot: 'bg-green-400',
+    aria: 'Show more of character',
+  },
+  {
+    key: 'copyright',
+    read: (i) => i.copyrights,
+    max: 1,
+    dot: 'bg-purple-400',
+    aria: 'Show more from',
+  },
+]
 
 const RATING_LABEL: Record<string, string> = {
   g: 'General',
@@ -61,7 +96,7 @@ export function PostView({
   maxBytes,
   onSave,
   onToggleMute,
-  onArtistClick,
+  onTagClick,
 }: Props) {
   const isVideo = item.kind === 'video' || item.kind === 'ugoira'
   const isEmbed = item.kind === 'embed'
@@ -185,12 +220,28 @@ export function PostView({
 
   const rating = item.rating?.toLowerCase()
 
-  // `tag_string` already contains the artist tags, so the generic chip row would
-  // show them a second time. They get their own affordance instead.
-  const artistTags = useMemo(() => new Set(item.artists), [item.artists])
+  // `tag_string` already contains every category, so the generic chip row would show
+  // artists, characters and copyrights a second time. They get the browsable row.
+  const { entityChips, hiddenEntityCount } = useMemo(() => {
+    const chips: Array<{ key: string; tag: string; dot: string; aria: string }> = []
+    let hidden = 0
+    for (const kind of ENTITY_KINDS) {
+      const list = kind.read(item)
+      for (const tag of list.slice(0, kind.max)) {
+        chips.push({ key: `${kind.key}:${tag}`, tag, dot: kind.dot, aria: kind.aria })
+      }
+      if (list.length > kind.max) hidden += list.length - kind.max
+    }
+    return { entityChips: chips, hiddenEntityCount: hidden }
+  }, [item])
+
+  const entityTags = useMemo(
+    () => new Set([...item.artists, ...item.characters, ...item.copyrights]),
+    [item],
+  )
   const otherTags = useMemo(
-    () => item.tags.filter((tag) => !artistTags.has(tag)),
-    [item.tags, artistTags],
+    () => item.tags.filter((tag) => !entityTags.has(tag)),
+    [item.tags, entityTags],
   )
 
   return (
@@ -306,31 +357,27 @@ export function PostView({
 
       {/* Meta */}
       <div className="absolute bottom-8 left-3 z-20 max-w-[calc(100%-5rem)]">
-        {/* Artist attribution. Tapping it searches the exact artist tag, which is how
-            the whole feed becomes "more from this artist". */}
-        {item.artists.length > 0 && (
+        {/* Browsable entity tags. Tapping one searches that exact tag, so the feed
+            becomes "everything else with this artist / character / series". */}
+        {entityChips.length > 0 && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {item.artists.slice(0, MAX_ARTIST_CHIPS).map((artist) => (
+            {entityChips.map((chip) => (
               <button
-                key={artist}
+                key={chip.key}
                 type="button"
-                onClick={() => onArtistClick(artist)}
-                aria-label={`Show more by ${tagLabel(artist)}`}
-                className="flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-1.5 pr-1.5 ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 active:scale-95"
+                onClick={() => onTagClick(chip.tag)}
+                aria-label={`${chip.aria} ${tagLabel(chip.tag)}`}
+                className="flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-2 pr-1.5 ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 active:scale-95"
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-400 text-black">
-                  <IconArtist className="h-3 w-3" />
-                </span>
+                <span className={`h-2 w-2 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
                 <span className="truncate text-[12px] font-semibold text-white">
-                  {tagLabel(artist)}
+                  {tagLabel(chip.tag)}
                 </span>
                 <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-white/50" />
               </button>
             ))}
-            {item.artists.length > MAX_ARTIST_CHIPS && (
-              <span className="px-1 text-[11px] text-white/50">
-                +{item.artists.length - MAX_ARTIST_CHIPS}
-              </span>
+            {hiddenEntityCount > 0 && (
+              <span className="px-1 text-[11px] text-white/50">+{hiddenEntityCount}</span>
             )}
           </div>
         )}

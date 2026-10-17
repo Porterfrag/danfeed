@@ -32,7 +32,7 @@ Fix it with Secure DNS or a VPN:
 | Filter chips | All · Videos · Photos · Animated · Top |
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
-| Artist | Tap the artist on any slide to load everything else by them |
+| Browsable tags | Tap the artist, character or series on a slide to load more like it |
 | Rating | Safe by default; Moderate/Everything opt-in per browser (see below) |
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
 | Settings | Content rating, video size cap, start-with-sound, reset history |
@@ -50,34 +50,46 @@ for the wrong thing. The UI shows `label` and inserts `value`.
 Suggestions are cached per prefix and debounced at 150 ms, and autocomplete has its own request lane
 so typing never queues behind a feed page load.
 
-## Browsing an artist
+## Browsing tags
 
-Every slide with an artist tag shows a chip for them, above the tag row. Tapping it searches that
-artist's work, so the feed becomes "everything else by this person".
+Every slide carries a browsable row above the `#tag` chips: the **artist** who drew it, the
+**character** depicted, and the **copyright** (series) it belongs to. Tapping any of them searches
+that exact tag, so the feed becomes everything else with that artist, character or series.
 
-The chip is a real search, not a hidden mode: the artist tag lands in the search box, where it stays
+The chip is a real search, not a hidden mode: the tag lands in the search box, where it stays
 visible, editable and clearable, and the *danfeed* logo still returns to the default feed.
 
-Three details that are easy to get wrong:
+The dot colour is Danbooru's own taxonomy — artist red, character green, copyright purple — so the
+row reads the way the site does.
 
-- **Display is not the same as the search.** The chip reads `anna (k0130)` but searches
-  `anna_(k0130)`. This is Danbooru's own label/value split, the same rule the autocomplete follows:
-  underscores are read as spaces for humans, but only the underscored form matches anything.
-- **The artist tag is already inside `tag_string`.** Verified against the live API — every post's
-  `tag_string` includes its artist tags — so rendering `tags` as-is would show the artist twice. The
-  artist tags are filtered out of the `#tag` row and given the chip instead.
-- **Tapping an artist resets the filter chip to All.** An active *Videos* or *Top* filter would
-  otherwise silently return nothing for an artist who only posts stills, which reads as a bug rather
-  than as a filter.
+Six things that are easy to get wrong:
 
-Collaborations show up to three chips and count the rest (`+1`), and a post with no artist tag simply
-shows no chip. Artist tags are ordinary tags, so one costs one search slot — the default `rating:` is
-free and composes with it.
+- **Display is not the same as the search.** A chip reads `narita taishin (umamusume)` but searches
+  `narita_taishin_(umamusume)`. This is Danbooru's own label/value split, the same rule the
+  autocomplete follows: underscores are read as spaces for humans, but only the underscored form
+  matches anything.
+- **Every entity tag is already inside `tag_string`.** Verified against the live API — a post's
+  `tag_string` contains its artist, character and copyright tags too — so rendering `tags` as-is
+  would show all three twice. They are filtered out of the `#tag` row and given the chip instead.
+- **The caps are per category, not for the row as a whole.** Group pictures routinely carry several
+  characters, and one shared cap would push the copyright off the slide entirely — which is the tag
+  most likely to identify the work. Each category is capped separately (2 artists, 2 characters,
+  1 copyright) and any remainder collapses into `+N`.
+- **Tapping a tag resets the filter chip to All.** An active *Videos* or *Top* filter would otherwise
+  silently return nothing for an artist who only posts stills, which reads as a bug rather than as a
+  filter.
+- **The general `#tag` chips are deliberately not tappable.** They are context, not navigation. The
+  first five tags of a post are things like `1girl`, `blonde_hair`, `highres`; searching one gives a
+  near-random feed, and as 11px pills they are far below a comfortable touch target. Browsing is
+  handled by the entity row, which is sized and styled to be tapped. Say the word if you want the
+  general row clickable too.
+- **Entity tags are ordinary tags.** One costs one search slot, and the default `rating:` is free, so
+  it composes with the rating filter without pushing a search over the limit.
 
-Artist data comes from `tag_string_artist`, which was added to the trimmed `only=` payload. Because
-that field is new, saved items written by earlier builds have no `artists` array at all; they are
-repaired on load in `lib/store.ts` rather than guarded at every render, so an old saved post cannot
-crash the feed when it is played.
+The three category fields (`tag_string_artist`, `tag_string_character`, `tag_string_copyright`) are
+part of the trimmed `only=` payload. Because they are new, saved items written by earlier builds have
+no `artists`, `characters` or `copyrights` arrays at all; they are repaired on load in `lib/store.ts`
+rather than guarded at every render, so an old saved post cannot crash the feed when it is played.
 
 ## The 2-tag limit
 
