@@ -1,24 +1,3 @@
-danfeed is licensed in two parts: the code is MIT, the artwork is not.
-
-## The artwork
-
-Copyright (c) 2026 Ridho Wahyu Darmawan. All rights reserved.
-
-src/logo.jpg
-src/assets/logo-mark.jpg
-public/favicon-32.png
-public/apple-touch-icon.png
-public/icon-192.png
-public/icon-512.png
-public/og.png (its mark is cropped from src/logo.jpg by scripts/make-og.ps1)
-and the banner image at the top of the README
-
-These are the author's own illustration and its crops. They are not covered by the MIT licence
-below and may not be copied, redistributed or modified without permission. Forking the code is
-fine; shipping the mascot as your own app's icon is not.
-
-## The code
-
 MIT License
 
 Copyright (c) 2026 Ridho Wahyu Darmawan
