@@ -22,6 +22,29 @@ npm run build
 npm run preview
 ```
 
+## Tests
+
+```bash
+npm run verify                    # lint + build + every end-to-end suite
+npm run test:e2e                  # the suites alone (builds first)
+npm run test:e2e -- tags rating   # a subset, reusing the current dist
+npm run shots                     # PNGs of the UI in tests/__shots__ (gitignored)
+```
+
+The suites in `tests/` drive the production build in headless Chrome and speak CDP directly — no
+test runner, no dependencies. They cannot use the live API (some networks DNS-block `*.donmai.us`,
+and Cloudflare fingerprints headless Chrome), so every request is answered from a fixture. A Chrome,
+Chromium or Edge binary is required; `CHROME_PATH` points at it when it is not in the usual place.
+`tests/run.mjs` gives each suite its own browser with a throwaway profile, and prints every built
+file's short SHA-256, so the build that was tested can be compared with the one that was deployed.
+
+| Suite | Covers |
+| --- | --- |
+| `tests/tags.mjs` | the general tag row, and the all-tags sheet behind `+N` |
+| `tests/entities.mjs` | artist / character / series chips: caps, de-duplication, exact searches |
+| `tests/rating.mjs` | the tag string that actually goes on the wire at each rating level |
+| `tests/search-panel.mjs` | the suggestion panel must stay out of the feed |
+
 ## Network requirement
 
 Danbooru must be reachable **from your browser**. Some ISPs (and some DNS resolvers) redirect
@@ -48,5 +71,14 @@ Fix it with Secure DNS or a VPN:
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
 | Settings | Content rating, video size cap, start-with-sound, reset history |
 | Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save |
+
+## Licence
+
+The code is MIT; the artwork — the mascot, its crops and the app icons — is all rights reserved.
+`LICENSE` names exactly which files that covers.
+
+danfeed is an unofficial client of Danbooru's public API and is not affiliated with it. No media is
+hosted here: every image and video is loaded from `cdn.donmai.us` and belongs to the artist or
+uploader who posted it.
 
 

@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Screenshots from `npm run shots` (tests/screenshots.mjs)
+tests/__shots__
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

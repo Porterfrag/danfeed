@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { autocompleteTags } from '../lib/danbooru'
 import type { TagSuggestion } from '../lib/danbooru'
+import { categorySpec } from '../lib/tagCategories'
 import { applySuggestion, splitQuery } from '../lib/tagInput'
 import { IconSearch } from './icons'
-
-const CATEGORY: Record<number, { label: string; className: string }> = {
-  0: { label: 'General', className: 'bg-white/10 text-white/55' },
-  1: { label: 'Artist', className: 'bg-amber-400/15 text-amber-300' },
-  3: { label: 'Series', className: 'bg-violet-400/15 text-violet-300' },
-  4: { label: 'Character', className: 'bg-emerald-400/15 text-emerald-300' },
-  5: { label: 'Meta', className: 'bg-sky-400/15 text-sky-300' },
-}
 
 /** Survives remounts, so retyping a prefix is instant. */
 const cache = new Map<string, TagSuggestion[]>()
@@ -224,7 +217,7 @@ export function TagSearch({ value, onChange }: Props) {
           className="df-fade-in absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900/95 py-1 shadow-2xl backdrop-blur-md"
         >
           {items.map((tag, index) => {
-            const cat = CATEGORY[tag.category] ?? CATEGORY[0]
+            const cat = categorySpec(tag.category)
             return (
               <button
                 key={tag.value}
@@ -243,7 +236,7 @@ export function TagSearch({ value, onChange }: Props) {
                   {tag.label}
                 </span>
                 <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cat.className}`}
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cat.badge}`}
                 >
                   {cat.label}
                 </span>

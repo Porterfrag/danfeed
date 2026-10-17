@@ -1,0 +1,26 @@
+name: ci
+
+# Lint and build on every push to main and every pull request. Cloudflare Pages already
+# rebuilds main on push, but that failure is easy to miss, and it says nothing about PRs.
+#
+# The end-to-end suites are not run here: they drive a real Chrome, which makes them slower
+# and more environment-sensitive than this gate is worth. Run `npm run verify` locally before
+# pushing app changes — see the README.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "verify:limit": "jiti verify-limit.ts"
+    "test:e2e": "node tests/run.mjs",
+    "verify": "npm run lint && npm run test:e2e",
+    "verify:limit": "jiti verify-limit.ts",
+    "shots": "node tests/screenshots.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
