@@ -1,4 +1,5 @@
-<img width="1024" height="572" alt="2e9d3283-6743-4923-a4d0-f4dc43e09c9d" src="https://github.com/user-attachments/assets/80a4364b-c1ba-47a9-a274-5299e147a3cb" />
+<img width="2752" height="1649" alt="Danfeed Banner (1)" src="https://github.com/user-attachments/assets/8ad04283-5ea8-4349-a030-1fcf9ca909e5" />
+
 
 
 # danfeed
