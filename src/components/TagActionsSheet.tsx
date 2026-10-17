@@ -95,7 +95,7 @@ export function TagActionsSheet({ target, onClose, onSearch, onRelated }: Props)
         />
       </div>
 
-      <p className="mt-3 px-3 text-[11px] leading-relaxed text-white/40">
+      <p className="mt-3 px-3 text-2xs leading-relaxed text-white/40">
         Post counts, comments and the wiki itself live on Danbooru. danfeed only searches.
       </p>
     </Sheet>

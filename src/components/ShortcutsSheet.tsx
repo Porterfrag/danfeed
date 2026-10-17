@@ -32,7 +32,7 @@ export function ShortcutsSheet({ open, onClose }: { open: boolean; onClose: () =
         ))}
       </dl>
 
-      <p className="mt-3 border-t border-white/10 px-3 pt-3 text-[11px] leading-relaxed text-white/40">
+      <p className="mt-3 border-t border-white/10 px-3 pt-3 text-2xs leading-relaxed text-white/40">
         Shortcuts stay out of the way while the search box has focus or a sheet is open, and
         Escape closes whatever is open. On a slide, hold a tag chip — or right-click it, or press
         Shift+F10 — for the wiki, Danbooru&apos;s own page and a copyable link.

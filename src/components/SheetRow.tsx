@@ -30,7 +30,7 @@ export function SheetRow({ id, label, href, sub, status, onClick }: Props) {
     <>
       <span className="min-w-0 flex-1">
         <span className="block text-sm text-white">{result ?? label}</span>
-        {sub && <span className="block truncate text-[11px] text-white/40">{sub}</span>}
+        {sub && <span className="block truncate text-2xs text-white/40">{sub}</span>}
       </span>
       {href && <IconExternal className="mt-0.5 h-4 w-4 shrink-0 text-white/30" />}
     </>

@@ -91,7 +91,7 @@ export function ShareSheet({ open, item, query, onClose }: Props) {
         )}
       </div>
 
-      <p className="mt-3 px-3 text-[11px] leading-relaxed text-white/40">
+      <p className="mt-3 px-3 text-2xs leading-relaxed text-white/40">
         Post links open on Danbooru, where the artist&apos;s credit lives. A danfeed search link
         opens with whatever content rating the person opening it chose for themselves.
       </p>

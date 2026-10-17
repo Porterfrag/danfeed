@@ -73,7 +73,7 @@ export function RelatedSheet({ target, onClose, onPick }: Props) {
 
   return (
     <Sheet open title="More like this" onClose={onClose}>
-      <p className="mb-3 px-3 text-[11px] leading-relaxed text-white/45">
+      <p className="mb-3 px-3 text-2xs leading-relaxed text-white/45">
         Tags Danbooru sees alongside the {noun} <span className="text-white/70">{label}</span>.
       </p>
 
@@ -114,7 +114,7 @@ export function RelatedSheet({ target, onClose, onPick }: Props) {
                   <span className="block truncate text-sm text-white/90">
                     {tagLabel(entry.tag)}
                   </span>
-                  <span className="block truncate text-[11px] text-white/40">
+                  <span className="block truncate text-2xs text-white/40">
                     {formatCount(entry.postCount)} posts
                     {entry.frequency > 0
                       ? ` · in ${Math.round(entry.frequency * 100)}% of ${label}`
@@ -129,7 +129,7 @@ export function RelatedSheet({ target, onClose, onPick }: Props) {
       )}
 
       {listed && (
-        <p className="mt-3 border-t border-white/10 px-3 pt-3 text-[11px] leading-relaxed text-white/35">
+        <p className="mt-3 border-t border-white/10 px-3 pt-3 text-2xs leading-relaxed text-white/35">
           Overlap is measured by Danbooru from the tag's own posts. Searching one applies this
           browser's rating, exactly like any other search.
         </p>

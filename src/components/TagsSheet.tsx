@@ -90,7 +90,7 @@ export function TagsSheet({ item, onClose, onPick, onActions }: Props) {
         <div className="space-y-4">
           {groups.map((group) => (
             <section key={group.key}>
-              <h3 className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/45">
+              <h3 className="mb-1 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-white/45">
                 <span className={`h-2 w-2 rounded-full ${group.dot}`} aria-hidden />
                 {group.label}
                 <span className="font-normal tabular-nums text-white/30">{group.tags.length}</span>
@@ -110,7 +110,7 @@ export function TagsSheet({ item, onClose, onPick, onActions }: Props) {
             </section>
           ))}
 
-          <p className="border-t border-white/10 pt-3 text-[11px] leading-relaxed text-white/35">
+          <p className="border-t border-white/10 pt-3 text-2xs leading-relaxed text-white/35">
             {total} tags on this post. Meta tags are flags rather than content — searching
             highres returns most of the site — so the slide row leaves them out.
           </p>

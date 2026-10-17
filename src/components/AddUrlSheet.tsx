@@ -86,7 +86,7 @@ export function AddUrlSheet({ open, onClose, onAdd }: Props) {
             key={example}
             type="button"
             onClick={() => setValue(example)}
-            className="block w-full truncate rounded-lg bg-white/5 px-2.5 py-1.5 text-left font-mono text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80"
+            className="block w-full truncate rounded-lg bg-white/5 px-2.5 py-1.5 text-left font-mono text-2xs text-white/50 hover:bg-white/10 hover:text-white/80"
           >
             {example}
           </button>

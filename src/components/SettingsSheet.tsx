@@ -107,7 +107,7 @@ function RatingSelector({
       </div>
 
       {explicit && (
-        <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
+        <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-2xs leading-relaxed text-amber-200/90">
           {value === 'sensitive'
             ? 'Sensitive content is now included in the feed.'
             : 'Everything is now included — general, sensitive, questionable and explicit.'}{' '}
@@ -271,7 +271,7 @@ export function SettingsSheet({
           </div>
           {status && (
             <p
-              className={`mt-2 text-[11px] leading-relaxed ${
+              className={`mt-2 text-2xs leading-relaxed ${
                 status.ok ? 'text-emerald-300/90' : 'text-amber-300/90'
               }`}
             >
@@ -280,7 +280,7 @@ export function SettingsSheet({
           )}
         </div>
 
-        <p className="pt-3 text-[11px] leading-relaxed text-white/30">
+        <p className="pt-3 text-2xs leading-relaxed text-white/30">
           Media is served by cdn.donmai.us. This app stores only your saved list, recent searches
           and settings in this browser.
         </p>

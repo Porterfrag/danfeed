@@ -55,7 +55,7 @@ export function SavedSheet({ open, onClose, items, onPlay, onRemove }: Props) {
                 <p className="truncate text-xs text-white/80">
                   {item.tags.slice(0, 4).map((tag) => `#${tag}`).join(' ') || item.title || 'Untitled'}
                 </p>
-                <p className="mt-0.5 text-[11px] text-white/35">
+                <p className="mt-0.5 text-2xs text-white/35">
                   {KIND_LABEL[item.kind] ?? item.kind}
                   {item.postId ? ` · #${item.postId}` : ''}
                   {item.origin === 'custom' ? ' · custom' : ''}

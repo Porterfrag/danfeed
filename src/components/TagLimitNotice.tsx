@@ -18,7 +18,7 @@ export function TagLimitNotice({ tokens, filterTokens, limit = TAG_LIMIT, onRemo
       <div className="w-full max-w-sm">
         <div className="mb-1 flex items-baseline gap-2">
           <span className="text-sm font-semibold text-white">Too many tags</span>
-          <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+          <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-2xs font-medium text-amber-300">
             {tokens.length} / {limit}
           </span>
         </div>
@@ -38,7 +38,7 @@ export function TagLimitNotice({ tokens, filterTokens, limit = TAG_LIMIT, onRemo
                 className="group flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 py-1 pl-2.5 pr-1.5 text-xs text-white/85 transition hover:border-rose-400/40 hover:bg-rose-500/15"
               >
                 <span className="font-mono">{token}</span>
-                {fromFilter && <span className="text-[9px] uppercase text-white/35">filter</span>}
+                {fromFilter && <span className="text-2xs uppercase text-white/35">filter</span>}
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/60 group-hover:bg-rose-500/30 group-hover:text-rose-200">
                   ×
                 </span>
