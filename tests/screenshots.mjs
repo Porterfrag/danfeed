@@ -8,10 +8,11 @@
  *   npm run shots                 every shot at a phone size
  *   npm run shots -- 900x900      a desktop-ish viewport, for the header
  *   npm run shots -- --no-build   reuse the existing dist
+ *   npm run shots -- --readme     also copy three of them into docs/ for the README
  *
  * Chrome must be installed, as for `npm run test:e2e`; CHROME_PATH overrides the search.
  */
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectToPage, setSearchText, sleep, stubApi, waitForSlides } from './lib/cdp.mjs'
@@ -33,6 +34,7 @@ const OUT = join(ROOT, 'tests', '__shots__')
 const argv = process.argv.slice(2)
 const size = argv.find((a) => /^\d+x\d+$/.test(a)) ?? process.env.SHOT_SIZE ?? '420x900'
 const noBuild = argv.includes('--no-build')
+const readme = argv.includes('--readme')
 
 // Two posts: a typical one, and a group picture with entity overflow.
 const POSTS = [
@@ -224,6 +226,22 @@ async function main() {
   await c.evalJS(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }))`)
   await sleep(400)
   await c.shot(join(OUT, 'shortcuts.png'))
+
+  if (readme) {
+    // The three the repository page links to. These are commits, not build output, so they are
+    // copies of the shots above (`docs/` is not gitignored) rather than the throwaway set.
+    const docs = join(ROOT, 'docs')
+    mkdirSync(docs, { recursive: true })
+    const picked = [
+      ['row.png', 'feed.png'],
+      ['related.png', 'related.png'],
+      ['shortcuts.png', 'shortcuts.png'],
+    ]
+    for (const [from, to] of picked) {
+      copyFileSync(join(OUT, from), join(docs, to))
+      console.log(`wrote docs/${to}`)
+    }
+  }
 }
 
 main()
