@@ -7,6 +7,7 @@ const K = {
   saved: 'danfeed.saved.v1',
   settings: 'danfeed.settings.v1',
   recent: 'danfeed.recent.v1',
+  related: 'danfeed.related.v1',
 } as const
 
 /** How many searches the box remembers. */
@@ -208,4 +209,20 @@ export function mergeSaved(
   const keys = new Set(current.map((item) => item.key))
   const added = incoming.filter((item) => !keys.has(item.key))
   return { saved: [...added, ...current], added: added.length, duplicates: incoming.length - added.length }
+}
+
+/**
+ * Whether the related-tags sheet has ever been opened in this browser.
+ *
+ * It gates exactly one thing: fetching related tags for the slide in front, before the sheet is
+ * opened. That is a request per slide, which is only worth spending for someone who has shown
+ * they look at the list. Not a setting, not part of a backup: it is a fact about usage, and a
+ * restored file does not change what this browser has done.
+ */
+export function loadRelatedUsed(): boolean {
+  return read<boolean>(K.related, false) === true
+}
+
+export function markRelatedUsed(): void {
+  write(K.related, true)
 }

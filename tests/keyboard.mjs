@@ -57,12 +57,27 @@ const POSTS = [
     file_url: 'https://cdn.donmai.us/original/aa/bb/910702.jpg',
     large_file_url: 'https://cdn.donmai.us/sample/aa/bb/910702.jpg',
     preview_file_url: 'https://cdn.donmai.us/180x180/aa/bb/910702.jpg',
-    tag_string: '1girl solo',
-    tag_count: 2,
+    tag_string: '1girl solo corn_kuten',
+    tag_string_artist: 'corn_kuten',
+    tag_count: 3,
     is_animated: false,
     media_asset: { id: 2, variants: [] },
   },
 ]
+
+/** One related row, so `r` has something to open onto. */
+const RELATED = {
+  query: 'corn_kuten',
+  post_count: 645,
+  tag: null,
+  related_tags: [
+    {
+      tag: { id: 1, name: 'long_hair', category: 0, post_count: 6319158, is_deprecated: false },
+      frequency: 0.69,
+    },
+  ],
+  wiki_page_tags: [],
+}
 
 const boxValue = `document.querySelector('[role="combobox"]').value`
 const liveText = `document.querySelector('[aria-live="polite"]').textContent ?? ''`
@@ -97,6 +112,7 @@ async function main() {
   const interceptor = await stubApi(c, [
     { match: 'donmai.us/posts.json', json: POSTS, record: postCalls },
     { match: 'donmai.us/autocomplete.json', json: [] },
+    { match: 'donmai.us/related_tag.json', json: RELATED },
     { match: 'cdn.donmai.us', image: PNG, contentLength: true },
   ])
 
@@ -272,6 +288,27 @@ async function main() {
     postCalls.at(-1),
   )
   check('the saved post from earlier is still saved', (await c.evalJS(railLabel(1))) === 'Remove from saved')
+
+  console.log('\n=== 10. r opens what the post is related to ===')
+  await c.evalJS(pressKey('r'))
+  await sleep(300)
+  check('a slide with no artist, character or series does nothing', (await c.evalJS(dialogTitle)) === '', await c.evalJS(dialogTitle))
+  await c.evalJS(pressKey('j'))
+  await waitForSlide(c, 1)
+  await c.evalJS(pressKey('r'))
+  await sleep(400)
+  check('r opens the related list for the post on screen', (await c.evalJS(dialogTitle)) === 'More like this', await c.evalJS(dialogTitle))
+  check(
+    'about the artist that post carries',
+    (await c.evalJS(`document.querySelector('[role="dialog"]').innerText`)).includes('alongside the artist corn kuten'),
+  )
+  check(
+    'with the row Danbooru answered with',
+    (await c.evalJS(`document.querySelector('[role="dialog"] [aria-label^="Search "]')?.getAttribute('aria-label')`)) === 'Search long hair',
+  )
+  await c.evalJS(pressKey('Escape'))
+  await sleep(300)
+  check('and escape closes it like any other sheet', (await c.evalJS(dialogTitle)) === '', await c.evalJS(dialogTitle))
 
   check('no uncaught page errors', pageErrors.length === 0, pageErrors.join(' | '))
 

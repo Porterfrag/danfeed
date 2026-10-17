@@ -7,6 +7,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ['s', 'Save the post'],
   ['m', 'Mute or unmute'],
   ['o', 'Open the original source'],
+  ['r', 'More like this, for the post on screen'],
   ['/', 'Jump to the search box'],
   ['h', 'Back to the default feed'],
   ['?', 'This list'],

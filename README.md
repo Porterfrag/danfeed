@@ -54,6 +54,7 @@ deployment.
 | `tests/retry.mjs` | which failures are repeated and which are final, for the API and for media |
 | `tests/pwa.mjs` | the service worker, the shell it caches, and opening offline |
 | `tests/a11y.mjs` | reduced motion, the live region, the dialog contract, the feed's structure |
+| `tests/discover.mjs` | fetching ahead of the finger, related tags, and the gate on both |
 
 ## Network requirement
 
@@ -77,6 +78,8 @@ Fix it with Secure DNS or a VPN:
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
 | Browsable tags | Every tag on a slide is one tap from a search; `+N` opens the full list |
+| More like this | Tap the compass — or press `r` — for what Danbooru sees alongside the post's artist (or character, or series); every row is a search, at this browser's rating. The list ahead is prefetched only after the sheet has been opened once |
+| Fetch ahead | The next page is asked for once a few slides are left, not when the bottom arrives |
 | Tag actions | Hold a tag chip — or right-click it — to search it here, open it on Danbooru, read its wiki, or copy the search link |
 | Rating | Safe by default; Moderate/Everything opt-in per browser |
 | Recent searches | An empty search box offers your last few searches; tap one to run it again |
@@ -99,6 +102,7 @@ Fix it with Secure DNS or a VPN:
 | `s` | Save the post |
 | `m` | Mute or unmute |
 | `o` | Open the original source |
+| `r` | More like this, for the post on screen |
 | `/` | Jump to the search box |
 | `h` | Back to the default feed |
 | `?` | This list, in the app |

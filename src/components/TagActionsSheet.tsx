@@ -25,17 +25,20 @@ interface Props {
   target: TagTarget | null
   onClose: () => void
   onSearch: (tag: string) => void
+  /** Look for what Danbooru considers related to this tag. */
+  onRelated: (target: TagTarget) => void
 }
 
 /**
  * Everything about one tag that is not "search it".
  *
  * The chip's tap already means search, so this holds what a search cannot say: who the artist is
- * (Danbooru's wiki), the tag's own gallery with its post count and comments, and a link that can
- * be pasted somewhere else. Reached by holding a chip or right-clicking it, never by a tap, so
- * the one-tap search keeps working exactly as it did.
+ * (Danbooru's wiki), the tag's own gallery with its post count and comments, a link that can be
+ * pasted somewhere else, and — for the tags that have one — a list of what usually appears
+ * alongside it. Reached by holding a chip or right-clicking it, never by a tap, so the one-tap
+ * search keeps working exactly as it did.
  */
-export function TagActionsSheet({ target, onClose, onSearch }: Props) {
+export function TagActionsSheet({ target, onClose, onSearch, onRelated }: Props) {
   const [status, setStatus] = useState<{ id: string; ok: boolean } | null>(null)
 
   useEffect(() => {
@@ -65,6 +68,11 @@ export function TagActionsSheet({ target, onClose, onSearch }: Props) {
           sub="Everything with this tag, in this feed"
           status={status}
           onClick={() => onSearch(target.tag)}
+        />
+        <SheetRow
+          label={`More like this: tags that go with ${label}`}
+          sub="Danbooru's own overlap data for this tag"
+          onClick={() => onRelated(target)}
         />
         <SheetRow
           label={`Open ${label} on Danbooru`}

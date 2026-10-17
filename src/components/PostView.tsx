@@ -5,11 +5,14 @@ import { TAG_CATEGORY } from '../lib/tagCategories'
 import type { TagCategoryKey } from '../lib/tagCategories'
 import { useReducedMotion } from '../lib/useReducedMotion'
 import { useZoom } from '../lib/useZoom'
+import { tagLabel } from '../lib/danbooru'
+import { relatedSubject } from '../lib/related'
 import { TagChip } from './TagChip'
 import type { TagTarget } from './TagActionsSheet'
 import {
   IconBookmark,
   IconChevronRight,
+  IconCompass,
   IconExternal,
   IconPlay,
   IconShare,
@@ -35,6 +38,8 @@ interface Props {
   onShowAllTags: (item: MediaItem) => void
   /** Open the share sheet for this post. */
   onShare: (item: MediaItem) => void
+  /** Look for what Danbooru considers related to the tag this post is known by. */
+  onRelated: (target: TagTarget) => void
 }
 
 /**
@@ -135,10 +140,16 @@ export function PostView({
   onTagActions,
   onShowAllTags,
   onShare,
+  onRelated,
 }: Props) {
   const isVideo = item.kind === 'video' || item.kind === 'ugoira'
   const isEmbed = item.kind === 'embed'
   const isImage = item.kind === 'photo' || item.kind === 'gif'
+
+  // The artist who made it, else the character, else the series — the one tag "more like this"
+  // can actually be about. Null on a post that carries none of the three, and then there is no
+  // button: a general tag describes the picture rather than a body of work to explore.
+  const subject = relatedSubject(item)
 
   const [failed, setFailed] = useState(false)
   const [forced, setForced] = useState(false)
@@ -539,6 +550,18 @@ export function PostView({
             className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
           >
             {muted ? <IconVolumeOff /> : <IconVolumeOn />}
+          </button>
+        )}
+
+        {subject && (
+          <button
+            type="button"
+            onClick={() => onRelated(subject)}
+            aria-label="More like this"
+            title={`Tags that go with ${tagLabel(subject.tag)}`}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+          >
+            <IconCompass />
           </button>
         )}
 

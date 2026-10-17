@@ -79,6 +79,11 @@ function makeScheduler(minGapMs: number) {
 const schedule = makeScheduler(350)
 /** Autocomplete — needs to feel instant, still rate-limit friendly. */
 const scheduleFast = makeScheduler(150)
+/**
+ * Related tags. User-initiated like autocomplete, and the same kind of burst when sliding
+ * through a feed with the sheet open, but it never blocks typing: its own lane, its own gap.
+ */
+const scheduleRelated = makeScheduler(250)
 
 async function getOnce<T>(url: string): Promise<T> {
   let res: Response
@@ -335,6 +340,74 @@ export async function autocompleteTags(query: string, limit = 8): Promise<TagSug
 }
 
 /* ------------------------------------------------------------------ */
+/* Related tags                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface RelatedTag {
+  /** The canonical tag to search with. */
+  tag: string
+  /** Danbooru's category integer: 0 general, 1 artist, 3 copyright, 4 character. */
+  category: number
+  postCount: number
+  /** The share of the query tag's posts that carry this one, 0..1. */
+  frequency: number
+}
+
+interface RelatedRow {
+  tag?: {
+    name?: string
+    category?: number
+    post_count?: number
+    is_deprecated?: boolean
+  }
+  frequency?: number
+}
+
+/** Asked for, kept, and what is actually shown after the filters below. */
+const RELATED_ASK = 20
+const RELATED_LIMIT = 12
+
+/**
+ * What Danbooru says usually appears alongside a tag.
+ *
+ * The overlap is computed live from that tag's own posts, so the list is the site's taste rather
+ * than ours, needs no query of its own, and carries no rating: the search that follows applies
+ * whatever this browser is allowed to show.
+ *
+ * Two kinds of row are dropped rather than shown. The tag itself comes back first (overlap 1.0,
+ * which says nothing) and meta tags ride along — `highres` is on nine posts in ten, which is a
+ * fact about the site, not about the tag being looked at.
+ */
+export async function relatedTags(tag: string): Promise<RelatedTag[]> {
+  const url = `${API}/related_tag.json?query=${encodeURIComponent(tag)}&limit=${RELATED_ASK}`
+
+  const payload = await scheduleRelated(() =>
+    getJson<{ related_tags?: RelatedRow[] }>(url),
+  )
+  const rows = Array.isArray(payload?.related_tags) ? payload.related_tags : []
+
+  const related: RelatedTag[] = []
+  for (const row of rows) {
+    const name = row.tag?.name
+    if (!name || name === tag) continue
+    if (row.tag?.is_deprecated) continue
+
+    const category = row.tag?.category ?? 0
+    if (category === 5) continue
+
+    related.push({
+      tag: name,
+      category,
+      postCount: row.tag?.post_count ?? 0,
+      frequency: row.frequency ?? 0,
+    })
+    if (related.length >= RELATED_LIMIT) break
+  }
+
+  return related
+}
+
+/* ------------------------------------------------------------------ */
 /* Display                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -348,6 +421,18 @@ export async function autocompleteTags(query: string, limit = 8): Promise<TagSug
  */
 export function tagLabel(tag: string): string {
   return tag.replace(/_/g, ' ')
+}
+
+/**
+ * A post count as short as it stays readable: `42150` -> "42k", `3096144` -> "3.1M".
+ *
+ * Shared by the search panel's badges and the related list, so the same number never reads two
+ * ways in two places.
+ */
+export function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}k`
+  return String(n)
 }
 
 /* ------------------------------------------------------------------ */

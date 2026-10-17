@@ -6,6 +6,7 @@ import { SettingsSheet } from './components/SettingsSheet'
 import type { RestoreOutcome } from './components/SettingsSheet'
 import { SavedSheet } from './components/SavedSheet'
 import { ShareSheet } from './components/ShareSheet'
+import { RelatedSheet } from './components/RelatedSheet'
 import { ShortcutsSheet } from './components/ShortcutsSheet'
 import { TagActionsSheet } from './components/TagActionsSheet'
 import type { TagTarget } from './components/TagActionsSheet'
@@ -16,8 +17,10 @@ import { announce } from './lib/announce'
 import {
   buildBackup,
   loadRecent,
+  loadRelatedUsed,
   loadSaved,
   loadSettings,
+  markRelatedUsed,
   mergeRecent,
   mergeSaved,
   parseBackup,
@@ -77,6 +80,10 @@ export default function App() {
   const [shareItem, setShareItem] = useState<MediaItem | null>(null)
   /** The tag whose actions sheet is open, if any. */
   const [tagTarget, setTagTarget] = useState<TagTarget | null>(null)
+  /** The tag whose related list is open, if any. */
+  const [relatedTarget, setRelatedTarget] = useState<TagTarget | null>(null)
+  /** Whether that sheet has ever been opened here — it decides whether the app warms the list. */
+  const [relatedUsed, setRelatedUsed] = useState<boolean>(() => loadRelatedUsed())
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [scrollSignal, setScrollSignal] = useState(0)
 
@@ -120,7 +127,12 @@ export default function App() {
    * The sheets are siblings of the feed, not children, or this would disable them too.
    */
   const sheetOpen =
-    sheet !== null || tagsItem !== null || shareItem !== null || tagTarget !== null || shortcutsOpen
+    sheet !== null ||
+    tagsItem !== null ||
+    shareItem !== null ||
+    tagTarget !== null ||
+    relatedTarget !== null ||
+    shortcutsOpen
 
   const savedKeys = useMemo(() => new Set(saved.map((item) => item.key)), [saved])
 
@@ -195,6 +207,7 @@ export default function App() {
     setTagsItem(null)
     setShareItem(null)
     setTagTarget(null)
+    setRelatedTarget(null)
     setShortcutsOpen(false)
     setScrollSignal((n) => n + 1)
     resetToDefault()
@@ -212,6 +225,37 @@ export default function App() {
     },
     [searchTag],
   )
+
+  /**
+   * Run one tag as a fresh search from whichever sheet offered it, closing the sheets on the way.
+   *
+   * The actions sheet can be opened from the all-tags list, and the related list from the actions
+   * sheet, so a search started from any of them has to put every one away: the feed underneath is
+   * about to change completely, and a sheet left standing would be about a post that is gone.
+   */
+  const searchFromSheets = useCallback(
+    (tag: string) => {
+      setTagsItem(null)
+      setTagTarget(null)
+      setRelatedTarget(null)
+      browseTag(tag)
+    },
+    [browseTag],
+  )
+
+  /**
+   * Open the related list for a tag.
+   *
+   * The first open is also what switches on warming it: from here on, whichever slide comes to
+   * rest in front gets its related list asked for in the background, so the next press of the
+   * button opens onto an answer instead of a spinner. The flag lives in localStorage because it
+   * is a fact about this browser's usage, not a setting to restore.
+   */
+  const openRelated = useCallback((target: TagTarget) => {
+    setRelatedUsed(true)
+    markRelatedUsed()
+    setRelatedTarget(target)
+  }, [])
 
   const items = useMemo(() => [...extras, ...feed.items], [extras, feed.items])
 
@@ -260,6 +304,8 @@ export default function App() {
             announce('Recent searches cleared')
           }}
           onShare={setShareItem}
+          onRelated={openRelated}
+          relatedUsed={relatedUsed}
           onShowShortcuts={() => setShortcutsOpen(true)}
           shortcutsEnabled={!sheetOpen}
         />
@@ -310,23 +356,21 @@ export default function App() {
       <TagsSheet
         item={tagsItem}
         onClose={() => setTagsItem(null)}
-        onPick={(tag) => {
-          setTagsItem(null)
-          browseTag(tag)
-        }}
+        onPick={searchFromSheets}
         onActions={setTagTarget}
       />
 
       <TagActionsSheet
         target={tagTarget}
         onClose={() => setTagTarget(null)}
-        onSearch={(tag) => {
-          // The sheet may have been opened from the all-tags list, which is now showing a post
-          // that is no longer the one on screen.
-          setTagsItem(null)
-          setTagTarget(null)
-          browseTag(tag)
-        }}
+        onSearch={searchFromSheets}
+        onRelated={openRelated}
+      />
+
+      <RelatedSheet
+        target={relatedTarget}
+        onClose={() => setRelatedTarget(null)}
+        onPick={searchFromSheets}
       />
 
       <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { autocompleteTags } from '../lib/danbooru'
+import { autocompleteTags, formatCount } from '../lib/danbooru'
 import type { TagSuggestion } from '../lib/danbooru'
 import { categorySpec } from '../lib/tagCategories'
 import { applySuggestion, splitQuery } from '../lib/tagInput'
@@ -15,12 +15,6 @@ function remember(query: string, rows: TagSuggestion[]) {
     if (oldest !== undefined) cache.delete(oldest)
   }
   cache.set(query, rows)
-}
-
-function formatCount(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}k`
-  return String(n)
 }
 
 interface Props {

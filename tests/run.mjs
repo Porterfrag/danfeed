@@ -45,6 +45,7 @@ const SUITES = [
   'retry',
   'pwa',
   'a11y',
+  'discover',
 ]
 const SUITE_TIMEOUT_MS = Number(process.env.SUITE_TIMEOUT_MS || 240_000)
 

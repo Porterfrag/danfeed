@@ -3,6 +3,8 @@ import type { MediaItem } from '../types'
 import type { BooruError } from '../lib/danbooru'
 import { announce } from '../lib/announce'
 import { useReducedMotion } from '../lib/useReducedMotion'
+import { useRelatedPrefetch } from '../lib/useRelatedPrefetch'
+import { relatedSubject } from '../lib/related'
 import { CHIPS } from '../hooks/useFeed'
 import type { ChipId } from '../hooks/useFeed'
 import logoMark from '../assets/logo-mark.jpg'
@@ -59,7 +61,17 @@ interface Props {
   onClearRecents: () => void
   /** Open the share sheet for a post. */
   onShare: (item: MediaItem) => void
+  /** Open the related-tags sheet for one tag. */
+  onRelated: (target: TagTarget) => void
+  /**
+   * Whether this browser has opened the related-tags sheet before. Gates warming the answer for
+   * whatever slide is in front: a request per slide is only worth it once it gets looked at.
+   */
+  relatedUsed: boolean
 }
+
+/** Slides left before the next page is asked for. See the effect below. */
+const PREFETCH_AHEAD = 3
 
 export function Feed({
   items,
@@ -95,6 +107,8 @@ export function Feed({
   recents,
   onClearRecents,
   onShare,
+  onRelated,
+  relatedUsed,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -136,11 +150,10 @@ export function Feed({
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return
-        // With an error on screen and nothing loaded, the observer is firing at the empty layout
-        // rather than at anything the user scrolled to. Loading again would be a blind retry of
-        // the request that just failed — often one whose answer will not change — and the error
-        // card is already offering the way back.
-        if (error !== null && items.length === 0) return
+        // An error on screen means the next move is the card's: either its Try again, or the
+        // empty feed's own card. Loading again because the bottom of the feed came into view
+        // would be a blind retry of a request that just failed.
+        if (error !== null) return
         onLoadMore()
       },
       { root, rootMargin: '800px 0px' },
@@ -149,6 +162,27 @@ export function Feed({
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [onLoadMore, items.length, error])
+
+  /**
+   * Fetch ahead of the finger.
+   *
+   * The sentinel above is where the browser is: it fires when the bottom of the feed comes into
+   * range, which on a full-screen feed is about one slide from the end. This is where the reader
+   * is — once a few slides are left, the next page is asked for while there is still feed to
+   * scroll. By the time the last slide arrives the page has usually landed, and the images that
+   * came with it have started loading (`distance <= 3` in PostView).
+   *
+   * An error stops it for the same reason the sentinel stops: repeated failing requests behind a
+   * card that already says what happened is not discovery.
+   */
+  useEffect(() => {
+    if (items.length === 0 || !hasMore || loading || error !== null) return
+    if (items.length - active > PREFETCH_AHEAD) return
+    onLoadMore()
+  }, [active, items.length, hasMore, loading, error, onLoadMore])
+
+  // The related list for whatever is in front, once the sheet has been used in this browser.
+  useRelatedPrefetch(items[active], relatedUsed)
 
   useEffect(() => {
     if (scrollToTopSignal === 0) return
@@ -220,6 +254,14 @@ export function Feed({
         case 'O':
           if (item?.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener')
           break
+        case 'r':
+        case 'R': {
+          // The rail's compass, for a keyboard. Slides with no artist, character or series have
+          // no subject — the key does nothing there, exactly like the button that is not there.
+          const subject = item ? relatedSubject(item) : null
+          if (subject) onRelated(subject)
+          break
+        }
         case '/':
           // Without this, Firefox opens its quick-find bar instead.
           e.preventDefault()
@@ -247,6 +289,7 @@ export function Feed({
     onToggleMute,
     onHomeClick,
     onShowShortcuts,
+    onRelated,
     reduced,
     shortcutsEnabled,
   ])
@@ -288,6 +331,7 @@ export function Feed({
                 onTagActions={onTagActions}
                 onShowAllTags={onShowAllTags}
                 onShare={onShare}
+                onRelated={onRelated}
               />
             </div>
           ))}

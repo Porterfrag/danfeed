@@ -156,3 +156,12 @@ export function IconShare({ className = base }: IconProps) {
     </svg>
   )
 }
+
+export function IconCompass({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.6 8.4-2.1 5.1-5.1 2.1 2.1-5.1 5.1-2.1Z" strokeLinejoin="round" />
+    </svg>
+  )
+}

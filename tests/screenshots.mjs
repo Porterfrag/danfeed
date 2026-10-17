@@ -74,6 +74,29 @@ const AUTOCOMPLETE = [
   { value: 'blue_dress', label: 'blue dress', category: 0, post_count: 42150 },
 ]
 
+/** `related_tag.json` in the shape the live endpoint answers with: the tag itself, meta, and rows. */
+const RELATED = {
+  query: 'corn_kuten',
+  post_count: 645,
+  tag: null,
+  related_tags: [
+    ['corn_kuten', 1, 1, 645],
+    ['commentary_request', 5, 0.82, 6438530],
+    ['long_hair', 0, 0.69, 6319158],
+    ['open_mouth', 0, 0.68, 5000000],
+    ['blue_dress', 0, 0.42, 42150],
+    ['absurdres', 5, 0.5, 3075827],
+    ['looking_at_viewer', 0, 0.37, 5010308],
+  ].map(([name, category, frequency, post_count]) => ({
+    tag: { id: 1, name, category, post_count, is_deprecated: false },
+    cosine_similarity: frequency,
+    jaccard_similarity: frequency / 10,
+    overlap_coefficient: frequency,
+    frequency,
+  })),
+  wiki_page_tags: [],
+}
+
 let preview = null
 let browser = null
 let profile = null
@@ -103,6 +126,7 @@ async function main() {
   await stubApi(c, [
     { match: '/autocomplete.json', json: AUTOCOMPLETE },
     { match: '/posts.json', json: POSTS },
+    { match: '/related_tag.json', json: RELATED },
     {
       match: 'cdn.donmai.us',
       image: Buffer.from(GRADIENT).toString('base64'),
@@ -186,6 +210,13 @@ async function main() {
   )
   await sleep(400)
   await c.shot(join(OUT, 'tag-actions.png'))
+  await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
+  await sleep(300)
+
+  // More like this: what Danbooru says usually appears alongside the artist on the slide.
+  await c.evalJS(`document.querySelector('[data-slide] [aria-label="More like this"]').click()`)
+  await sleep(500)
+  await c.shot(join(OUT, 'related.png'))
   await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
   await sleep(300)
 
