@@ -1,7 +1,15 @@
+import { useRef, useState } from 'react'
 import type { Settings } from '../lib/store'
 import type { RatingLevel } from '../lib/tagQuery'
 import { Sheet } from './Sheet'
 import { IconTrash } from './icons'
+
+/** What a restore actually changed, for the line under the buttons. */
+export interface RestoreOutcome {
+  added: number
+  duplicates: number
+  recent: number
+}
 
 interface Props {
   open: boolean
@@ -11,6 +19,10 @@ interface Props {
   savedCount: number
   onClearSaved: () => void
   onClearHistory: () => void
+  /** Save everything in this browser as a file. */
+  onExport: () => void
+  /** Merge a backup file's contents; null when the text is not a danfeed backup. */
+  onRestore: (text: string) => RestoreOutcome | null
 }
 
 function Toggle({
@@ -114,7 +126,42 @@ export function SettingsSheet({
   savedCount,
   onClearSaved,
   onClearHistory,
+  onExport,
+  onRestore,
 }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+
+  async function restore(file: File) {
+    let text: string
+    try {
+      text = await file.text()
+    } catch {
+      setStatus({ ok: false, text: 'That file could not be read.' })
+      return
+    }
+
+    const result = onRestore(text)
+    if (!result) {
+      setStatus({ ok: false, text: 'That file is not a danfeed backup.' })
+      return
+    }
+
+    const parts: string[] = []
+    if (result.added > 0) {
+      parts.push(`${result.added} saved post${result.added === 1 ? '' : 's'} restored`)
+    }
+    if (result.duplicates > 0) parts.push(`${result.duplicates} already here`)
+    if (result.recent > 0) parts.push(`${result.recent} recent search${result.recent === 1 ? '' : 'es'} merged`)
+
+    setStatus({
+      ok: true,
+      text:
+        (parts.length > 0 ? parts.join(' · ') + '. ' : 'Nothing in that file to add. ') +
+        'Settings in the file were left alone.',
+    })
+  }
+
   return (
     <Sheet open={open} title="Settings" onClose={onClose}>
       <div className="divide-y divide-white/10">
@@ -180,9 +227,62 @@ export function SettingsSheet({
           </button>
         </div>
 
+        <div className="pt-3">
+          <span className="block text-sm text-white">Backup</span>
+          <p className="mb-2 text-xs text-white/45">
+            Saved posts, recent searches and settings as one file. Everything lives in this browser
+            only, so that file is the only copy that can move to another one.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              aria-label="Back up to a file"
+              onClick={() => {
+                onExport()
+                setStatus({ ok: true, text: 'Backup saved to your downloads.' })
+              }}
+              className="flex-1 rounded-lg bg-white/5 px-3 py-2.5 text-sm text-white/80 hover:bg-white/10"
+            >
+              Back up
+            </button>
+            <button
+              type="button"
+              aria-label="Restore from a backup file"
+              onClick={() => fileRef.current?.click()}
+              className="flex-1 rounded-lg bg-white/5 px-3 py-2.5 text-sm text-white/80 hover:bg-white/10"
+            >
+              Restore…
+            </button>
+            {/* Hidden because there is no such thing as styling a file input; the button above
+                opens it. Restored by hand rather than by label, so clearing the value after a
+                pick lets the same file be chosen twice in a row. */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              aria-label="Backup file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void restore(file)
+              }}
+            />
+          </div>
+          {status && (
+            <p
+              className={`mt-2 text-[11px] leading-relaxed ${
+                status.ok ? 'text-emerald-300/90' : 'text-amber-300/90'
+              }`}
+            >
+              {status.text}
+            </p>
+          )}
+        </div>
+
         <p className="pt-3 text-[11px] leading-relaxed text-white/30">
-          Media is served by cdn.donmai.us. This app stores only your saved list, settings and view
-          history in this browser.
+          Media is served by cdn.donmai.us. This app stores only your saved list, recent searches
+          and settings in this browser.
         </p>
       </div>
     </Sheet>

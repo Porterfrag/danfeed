@@ -3,7 +3,7 @@ import { autocompleteTags } from '../lib/danbooru'
 import type { TagSuggestion } from '../lib/danbooru'
 import { categorySpec } from '../lib/tagCategories'
 import { applySuggestion, splitQuery } from '../lib/tagInput'
-import { IconSearch } from './icons'
+import { IconHistory, IconSearch } from './icons'
 
 /** Survives remounts, so retyping a prefix is instant. */
 const cache = new Map<string, TagSuggestion[]>()
@@ -26,15 +26,26 @@ function formatCount(n: number) {
 interface Props {
   value: string
   onChange: (value: string) => void
+  /** Past searches, newest first. Offered when the box is empty and focused. */
+  recents: string[]
+  onClearRecents: () => void
 }
 
-export function TagSearch({ value, onChange }: Props) {
+export function TagSearch({ value, onChange, recents, onClearRecents }: Props) {
   const [items, setItems] = useState<TagSuggestion[]>([])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [recentsHidden, setRecentsHidden] = useState(false)
+  /**
+   * Whether the current value came from this box or was set from outside.
+   *
+   * Same distinction as `typedRef`, kept in state because it is read during render while
+   * `typedRef` is not allowed there.
+   */
+  const [boxOwnsValue, setBoxOwnsValue] = useState(true)
 
   const gen = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -44,12 +55,15 @@ export function TagSearch({ value, onChange }: Props) {
    * The last value that actually came out of this input.
    *
    * Text reaches the box two ways: typed into it, or set from outside — tapping a tag chip
-   * on a slide, or tapping the logo to reset the feed. Suggestions are a typing aid, so
-   * only the first should fetch anything or open the panel. Without this the two are
-   * indistinguishable, and browsing a tag dropped the suggestion list over the feed the
-   * user was trying to look at.
+   * on a slide, tapping the logo to reset the feed, or opening a shared `?q=` link. Suggestions
+   * are a typing aid, so only the first should fetch anything or open the panel. Without this
+   * the two are indistinguishable, and browsing a tag dropped the suggestion list over the feed
+   * the user was trying to look at.
+   *
+   * Starts empty rather than at the initial value: on the first render nothing has come out of
+   * the box yet, so a seeded search counts as set-from-outside and comes up quietly.
    */
-  const typedRef = useRef(value)
+  const typedRef = useRef('')
 
   // Complete only the word being typed, keeping earlier tags intact.
   const { token } = splitQuery(value)
@@ -57,13 +71,20 @@ export function TagSearch({ value, onChange }: Props) {
 
   useEffect(() => {
     if (value !== typedRef.current) {
-      // Someone else set the text. Put the panel away rather than completing their word.
+      // Someone else set the text — a chip, the logo, a cleared search, a shared link. Put the
+      // panel away rather than completing their word, and let the box go: a search the user did
+      // not type has no business holding their keyboard open, and a focus left behind would drop
+      // the history panel over the very feed the tap was meant to show.
+      setBoxOwnsValue(false)
       setItems([])
       setOpen(false)
       setLoading(false)
       setDone(false)
+      inputRef.current?.blur()
       return
     }
+
+    setBoxOwnsValue(true)
 
     if (!query) {
       setItems([])
@@ -113,13 +134,35 @@ export function TagSearch({ value, onChange }: Props) {
   const accept = useCallback(
     (tag: TagSuggestion) => {
       // `value` (underscored) is the searchable form; `label` is display-only.
-      onChange(applySuggestion(value, tag.value))
+      const next = applySuggestion(value, tag.value)
+      // This text came out of the box, so the bookkeeping follows it. Left stale, an accepted
+      // suggestion would look like an outside change and the box would be blurred out from
+      // under someone who is composing a second tag.
+      typedRef.current = next
+      onChange(next)
       setOpen(false)
       setItems([])
       setDone(false)
       inputRef.current?.focus()
     },
     [value, onChange],
+  )
+
+  /**
+   * Re-running a search from the history.
+   *
+   * The text is deliberately set the way a chip sets it: `typedRef` is left behind, so the
+   * effect above sees outside text — the panel stays shut and no autocomplete request goes out
+   * for a query the user picked rather than typed.
+   */
+  const pickRecent = useCallback(
+    (entry: string) => {
+      onChange(entry)
+      setItems([])
+      setOpen(false)
+      inputRef.current?.focus()
+    },
+    [onChange],
   )
 
   const move = useCallback(
@@ -154,6 +197,7 @@ export function TagSearch({ value, onChange }: Props) {
       }
     } else if (e.key === 'Escape') {
       setOpen(false)
+      setRecentsHidden(true)
     }
   }
 
@@ -163,6 +207,21 @@ export function TagSearch({ value, onChange }: Props) {
     const row = listRef.current?.children[highlight] as HTMLElement | undefined
     row?.scrollIntoView({ block: 'nearest' })
   }, [highlight])
+
+  /**
+   * History is only offered for a box the user is in and emptied themselves.
+   *
+   * A trailing space left behind by accepting a suggestion leaves the current *token* empty,
+   * and a chip or the logo can empty the whole box from outside — neither should drop a list
+   * over the feed. Hence the raw value is what gets checked, alongside whether the box is the
+   * one that put it there.
+   */
+  const showRecents =
+    focused &&
+    value.trim() === '' &&
+    boxOwnsValue &&
+    recents.length > 0 &&
+    !recentsHidden
 
   const showEmpty =
     focused && done && !loading && items.length === 0 && query.length >= 2 && !open
@@ -176,11 +235,13 @@ export function TagSearch({ value, onChange }: Props) {
         value={value}
         onChange={(e) => {
           typedRef.current = e.target.value
+          setRecentsHidden(false)
           onChange(e.target.value)
         }}
         onKeyDown={onKeyDown}
         onFocus={() => {
           setFocused(true)
+          setRecentsHidden(false)
           if (items.length > 0) setOpen(true)
         }}
         onBlur={() => {
@@ -193,7 +254,7 @@ export function TagSearch({ value, onChange }: Props) {
         autoCorrect="off"
         spellCheck={false}
         role="combobox"
-        aria-expanded={open}
+        aria-expanded={open || showRecents}
         aria-autocomplete="list"
         aria-controls="tag-suggestions"
         className="h-9 w-full rounded-full border border-white/10 bg-white/10 pl-8 pr-8 text-sm text-white placeholder:text-white/40 focus:border-white/25 focus:outline-none"
@@ -246,6 +307,45 @@ export function TagSearch({ value, onChange }: Props) {
               </button>
             )
           })}
+        </div>
+      )}
+
+      {showRecents && (
+        <div className="df-fade-in absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-md">
+          <div className="flex items-center justify-between px-2.5 pb-1 pt-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-white/35">
+              Recent
+            </span>
+            <button
+              type="button"
+              aria-label="Clear recent searches"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onClearRecents()
+                setRecentsHidden(true)
+              }}
+              className="text-[10px] text-white/45 transition hover:text-white/80"
+            >
+              Clear
+            </button>
+          </div>
+          <div id="tag-suggestions" role="listbox" className="pb-1">
+            {recents.map((entry) => (
+              <button
+                key={entry}
+                type="button"
+                role="option"
+                aria-selected={false}
+                aria-label={`Recent search ${entry}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pickRecent(entry)}
+                className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition hover:bg-white/8"
+              >
+                <IconHistory className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{entry}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

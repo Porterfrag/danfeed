@@ -25,6 +25,11 @@
 /icon-*.png
   Cache-Control: public, max-age=86400
 
+# The link-preview card keeps its name too, and crawlers are the least tolerant of a slow first
+# fetch there is.
+/og.png
+  Cache-Control: public, max-age=86400
+
 /manifest.webmanifest
   Cache-Control: public, max-age=86400
 

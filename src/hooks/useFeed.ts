@@ -29,10 +29,17 @@ const PAGE_SIZE = 20
 /** Keep paginating until we have something new, so a heavy "seen" history never stalls the feed. */
 const MAX_SCAN_PAGES = 6
 
-export function useFeed(rating: RatingLevel) {
+export interface FeedOptions {
+  /** Called when a query actually goes to the API, so it can be remembered. */
+  onSearch?: (query: string) => void
+  /** Seed the box from outside, e.g. a shared `?q=` link. Searched at once, without the debounce. */
+  initialQuery?: string
+}
+
+export function useFeed(rating: RatingLevel, { onSearch, initialQuery = '' }: FeedOptions = {}) {
   const [chip, setChip] = useState<ChipId>('all')
-  const [queryInput, setQueryInput] = useState('')
-  const [query, setQuery] = useState('')
+  const [queryInput, setQueryInput] = useState(initialQuery)
+  const [query, setQuery] = useState(initialQuery)
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<BooruError | null>(null)
@@ -51,6 +58,12 @@ export function useFeed(rating: RatingLevel) {
   const overLimitRef = useRef(false)
 
   const chipTags = useMemo(() => CHIPS.find((c) => c.id === chip)?.tags ?? '', [chip])
+
+  // Held in a ref so a new callback identity cannot re-run the search effect below.
+  const onSearchRef = useRef(onSearch)
+  useEffect(() => {
+    onSearchRef.current = onSearch
+  })
 
   const tags = useMemo(
     () => buildTags({ rating, chipTags, query }),
@@ -214,6 +227,10 @@ export function useFeed(rating: RatingLevel) {
   useEffect(() => {
     const analysis = analyzeTags(tags)
     overLimitRef.current = analysis.over
+
+    // A search that never went out is not history: an over-limit string is refused before the
+    // request, and the empty query is the default feed.
+    if (!analysis.over && query.trim()) onSearchRef.current?.(query)
 
     reset()
 

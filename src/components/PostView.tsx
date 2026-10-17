@@ -10,6 +10,7 @@ import {
   IconChevronRight,
   IconExternal,
   IconPlay,
+  IconShare,
   IconVolumeOff,
   IconVolumeOn,
 } from './icons'
@@ -28,6 +29,8 @@ interface Props {
   onTagClick: (tag: string) => void
   /** Open the full tag list for this post. */
   onShowAllTags: (item: MediaItem) => void
+  /** Open the share sheet for this post. */
+  onShare: (item: MediaItem) => void
 }
 
 /**
@@ -102,6 +105,7 @@ export function PostView({
   onToggleMute,
   onTagClick,
   onShowAllTags,
+  onShare,
 }: Props) {
   const isVideo = item.kind === 'video' || item.kind === 'ugoira'
   const isEmbed = item.kind === 'embed'
@@ -451,6 +455,15 @@ export function PostView({
             {muted ? <IconVolumeOff /> : <IconVolumeOn />}
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => onShare(item)}
+          aria-label="Share"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
+        >
+          <IconShare />
+        </button>
 
         {item.sourceUrl && (
           <a

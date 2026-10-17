@@ -42,6 +42,11 @@ interface Props {
   onShowAllTags: (item: MediaItem) => void
   /** True when the feed is allowed past the general rating. Drives the settings badge. */
   nsfw: boolean
+  /** Past searches, newest first, for the box's history panel. */
+  recents: string[]
+  onClearRecents: () => void
+  /** Open the share sheet for a post. */
+  onShare: (item: MediaItem) => void
 }
 
 export function Feed({
@@ -72,6 +77,9 @@ export function Feed({
   nsfw,
   onTagClick,
   onShowAllTags,
+  recents,
+  onClearRecents,
+  onShare,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -186,6 +194,7 @@ export function Feed({
               onToggleMute={onToggleMute}
               onTagClick={onTagClick}
               onShowAllTags={onShowAllTags}
+              onShare={onShare}
             />
           </div>
         ))}
@@ -217,7 +226,12 @@ export function Feed({
               <span className="hidden sm:inline">danfeed</span>
             </button>
 
-            <TagSearch value={queryInput} onChange={setQueryInput} />
+            <TagSearch
+              value={queryInput}
+              onChange={setQueryInput}
+              recents={recents}
+              onClearRecents={onClearRecents}
+            />
 
             <button
               type="button"

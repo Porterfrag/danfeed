@@ -60,6 +60,13 @@ const boxValue = `document.querySelector('[role="combobox"]').value`
 
 async function main() {
   const c = await connectToPage(CDP_PORT)
+  /**
+   * Headless Chrome never gives the page system focus, so `element.focus()` would set
+   * activeElement without firing a focus event and the "focusing alone" assertion below would
+   * pass without testing anything. This is what a phone has.
+   */
+  await c.send('Emulation.setFocusEmulationEnabled', { enabled: true })
+
   const pageErrors = watchPageErrors(c)
 
   await stubApi(c, [

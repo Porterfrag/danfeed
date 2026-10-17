@@ -3,23 +3,73 @@ import type { MediaItem } from './types'
 import { Feed } from './components/Feed'
 import { AddUrlSheet } from './components/AddUrlSheet'
 import { SettingsSheet } from './components/SettingsSheet'
+import type { RestoreOutcome } from './components/SettingsSheet'
 import { SavedSheet } from './components/SavedSheet'
+import { ShareSheet } from './components/ShareSheet'
 import { TagsSheet } from './components/TagsSheet'
 import { useFeed } from './hooks/useFeed'
-import { loadSaved, loadSettings, saveSaved, saveSettings } from './lib/store'
+import {
+  buildBackup,
+  loadRecent,
+  loadSaved,
+  loadSettings,
+  mergeRecent,
+  mergeSaved,
+  parseBackup,
+  recordRecent,
+  saveRecent,
+  saveSaved,
+  saveSettings,
+} from './lib/store'
 import type { Settings } from './lib/store'
+import { backupFilename, downloadText } from './lib/download'
 
 type SheetName = 'add' | 'saved' | 'settings' | null
 
+/**
+ * The `?q=` of a shared link, if there is one.
+ *
+ * The only thing the app reads out of the URL — there is no router behind this. Kept separate
+ * from consuming it so the address bar is not stripped inside a state initialiser, which React
+ * is free to run twice.
+ */
+function sharedQuery(): string {
+  try {
+    return new URLSearchParams(location.search).get('q')?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export default function App() {
+  const [initialQuery] = useState(sharedQuery)
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
-  const feed = useFeed(settings.rating)
+  const [recent, setRecent] = useState<string[]>(() => loadRecent())
+
+  /**
+   * Remember a search that actually went out.
+   *
+   * Returning `prev` when nothing changed matters: flipping a filter re-runs the search effect
+   * with the same query, and a fresh array identity there would re-render the feed for nothing.
+   */
+  const recordQuery = useCallback((query: string) => {
+    setRecent((prev) => {
+      const next = recordRecent(prev, query)
+      return next.length === prev.length && next.every((entry, i) => entry === prev[i])
+        ? prev
+        : next
+    })
+  }, [])
+
+  const feed = useFeed(settings.rating, { onSearch: recordQuery, initialQuery })
   const { resetToDefault, searchTag } = feed
   const [saved, setSaved] = useState<MediaItem[]>(() => loadSaved())
   const [extras, setExtras] = useState<MediaItem[]>([])
   const [sheet, setSheet] = useState<SheetName>(null)
   /** The post whose full tag list is open, if any. */
   const [tagsItem, setTagsItem] = useState<MediaItem | null>(null)
+  /** The post whose share sheet is open, if any. */
+  const [shareItem, setShareItem] = useState<MediaItem | null>(null)
   const [scrollSignal, setScrollSignal] = useState(0)
 
   useEffect(() => {
@@ -29,6 +79,16 @@ export default function App() {
   useEffect(() => {
     saveSaved(saved)
   }, [saved])
+
+  useEffect(() => {
+    saveRecent(recent)
+  }, [recent])
+
+  // A shared link is a starting point, not a mode the address bar keeps asserting after the
+  // search has been changed or cleared.
+  useEffect(() => {
+    if (initialQuery) history.replaceState(null, '', location.pathname)
+  }, [initialQuery])
 
   const muted = !settings.unmute
 
@@ -51,6 +111,39 @@ export default function App() {
     setScrollSignal((n) => n + 1)
   }, [])
 
+  /** Everything this browser holds, as one file. */
+  const exportBackup = useCallback(() => {
+    downloadText(backupFilename(), buildBackup(saved, recent, settings))
+  }, [saved, recent, settings])
+
+  /**
+   * Merge a backup file into what is here.
+   *
+   * Additive on purpose: the worst a wrong file can do is add entries. Settings in the file are
+   * deliberately not applied — a file should not be able to change what this browser is allowed
+   * to show without the person at the keyboard touching that switch themselves.
+   */
+  const restoreBackup = useCallback(
+    (text: string): RestoreOutcome | null => {
+      const backup = parseBackup(text)
+      if (!backup) return null
+
+      const merged = mergeSaved(saved, backup.saved)
+      setSaved(merged.saved)
+
+      const before = new Set(recent)
+      const mergedRecent = mergeRecent(recent, backup.recent)
+      setRecent(mergedRecent)
+
+      return {
+        added: merged.added,
+        duplicates: merged.duplicates,
+        recent: mergedRecent.filter((entry) => !before.has(entry)).length,
+      }
+    },
+    [saved, recent],
+  )
+
   /**
    * Tapping the danfeed logo behaves like a page reload: back to the top of the
    * default feed, with any pasted URLs and the current search cleared.
@@ -59,6 +152,7 @@ export default function App() {
     setExtras([])
     setSheet(null)
     setTagsItem(null)
+    setShareItem(null)
     setScrollSignal((n) => n + 1)
     resetToDefault()
   }, [resetToDefault])
@@ -113,6 +207,9 @@ export default function App() {
         nsfw={settings.rating !== 'general'}
         onTagClick={browseTag}
         onShowAllTags={setTagsItem}
+        recents={recent}
+        onClearRecents={() => setRecent([])}
+        onShare={setShareItem}
       />
 
       <AddUrlSheet
@@ -140,6 +237,15 @@ export default function App() {
         savedCount={saved.length}
         onClearSaved={() => setSaved([])}
         onClearHistory={feed.clearHistory}
+        onExport={exportBackup}
+        onRestore={restoreBackup}
+      />
+
+      <ShareSheet
+        open={shareItem !== null}
+        item={shareItem}
+        query={feed.queryInput}
+        onClose={() => setShareItem(null)}
       />
 
       <TagsSheet

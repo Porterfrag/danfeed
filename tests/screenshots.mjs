@@ -98,6 +98,8 @@ async function main() {
   if (!(await waitForCdp(cdpPort))) throw new Error('Chrome never opened its debug port')
 
   const c = await connectToPage(cdpPort)
+  // Headless Chrome never gives the page system focus, so `focus()` would not open anything.
+  await c.send('Emulation.setFocusEmulationEnabled', { enabled: true })
   await stubApi(c, [
     { match: '/autocomplete.json', json: AUTOCOMPLETE },
     { match: '/posts.json', json: POSTS },
@@ -136,6 +138,42 @@ async function main() {
   await c.evalJS(setSearchText('ph'))
   await sleep(800)
   await c.shot(join(OUT, 'panel.png'))
+
+  // Recent searches: an empty box, focused, with a little history behind it.
+  await c.evalJS(`document.querySelector('[role="combobox"]').blur()`)
+  await sleep(200)
+  await c.evalJS(setSearchText('blue_dress'))
+  await sleep(1000)
+  await c.evalJS(setSearchText('corn_kuten'))
+  await sleep(1000)
+  await c.evalJS(setSearchText(''))
+  await sleep(250)
+  await c.evalJS(`document.querySelector('[role="combobox"]').focus()`)
+  await sleep(300)
+  await c.shot(join(OUT, 'recents.png'))
+
+  // The share sheet, with a search in the box so every row is on screen.
+  await c.evalJS(setSearchText('corn_kuten'))
+  await sleep(300)
+  await c.evalJS(`document.querySelector('[role="combobox"]').blur()`)
+  await sleep(250)
+  await c.evalJS(`document.querySelector('[aria-label="Share"]').click()`)
+  await sleep(400)
+  await c.shot(join(OUT, 'share.png'))
+  await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
+  await sleep(300)
+
+  // Settings, scrolled to the backup block at the bottom of the sheet.
+  await c.evalJS(`document.querySelector('[aria-label^="Settings"]').click()`)
+  await sleep(400)
+  await c.evalJS(`(() => {
+    const h = Array.from(document.querySelectorAll('h2')).find((el) => el.textContent === 'Settings')
+    const panel = h?.parentElement?.parentElement
+    if (panel) panel.scrollTop = panel.scrollHeight
+    return panel ? 'scrolled' : 'no panel'
+  })()`)
+  await sleep(300)
+  await c.shot(join(OUT, 'backup.png'))
 }
 
 main()

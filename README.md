@@ -35,8 +35,10 @@ The suites in `tests/` drive the production build in headless Chrome and speak C
 test runner, no dependencies. They cannot use the live API (some networks DNS-block `*.donmai.us`,
 and Cloudflare fingerprints headless Chrome), so every request is answered from a fixture. A Chrome,
 Chromium or Edge binary is required; `CHROME_PATH` points at it when it is not in the usual place.
-`tests/run.mjs` gives each suite its own browser with a throwaway profile, and prints every built
-file's short SHA-256, so the build that was tested can be compared with the one that was deployed.
+`tests/run.mjs` gives each suite its own browser with a throwaway profile, and prints each built
+file's size and short SHA-256. Those fingerprints identify this build, not the hosted one: a host
+that compiles from git produces its own hashes, so compare sizes rather than hashes against a
+deployment.
 
 | Suite | Covers |
 | --- | --- |
@@ -44,6 +46,9 @@ file's short SHA-256, so the build that was tested can be compared with the one 
 | `tests/entities.mjs` | artist / character / series chips: caps, de-duplication, exact searches |
 | `tests/rating.mjs` | the tag string that actually goes on the wire at each rating level |
 | `tests/search-panel.mjs` | the suggestion panel must stay out of the feed |
+| `tests/history.mjs` | recent searches: what is remembered, and what stays quiet |
+| `tests/backup.mjs` | exporting a backup file, and merging one back in |
+| `tests/share.mjs` | share links, `?q=` links, and the preview metadata crawlers read |
 
 ## Network requirement
 
@@ -67,7 +72,10 @@ Fix it with Secure DNS or a VPN:
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
 | Browsable tags | Every tag on a slide is one tap from a search; `+N` opens the full list |
-| Rating | Safe by default; Moderate/Everything opt-in per browser (see below) |
+| Rating | Safe by default; Moderate/Everything opt-in per browser |
+| Recent searches | An empty search box offers your last few searches; tap one to run it again |
+| Backup | Saved posts, recent searches and settings to one JSON file — and back in, merged |
+| Share | Copy the post link, the media link, or a `?q=` link that opens this search elsewhere |
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
 | Settings | Content rating, video size cap, start-with-sound, reset history |
 | Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save |
