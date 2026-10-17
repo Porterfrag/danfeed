@@ -260,6 +260,17 @@ async function main() {
   await sleep(400)
   await c.shot(join(OUT, 'saved.png'))
 
+  // The over-limit notice: three tags in the box, the request refused before it is sent, and the
+  // button that takes them back out. The box is blurred first so the suggestion panel is not
+  // sitting on top of the thing being photographed.
+  await c.evalJS(setSearchText('1girl blue_dress absurdres silence'))
+  await sleep(400)
+  await c.evalJS(
+    `document.querySelector('[role="combobox"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+  )
+  await sleep(400)
+  await c.shot(join(OUT, 'tag-limit.png'))
+
   if (readme) {
     // The three the repository page links to. These are commits, not build output, so they are
     // copies of the shots above (`docs/` is not gitignored) rather than the throwaway set.
