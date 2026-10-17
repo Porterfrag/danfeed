@@ -32,6 +32,7 @@ export interface DanbooruPost {
   tag_string_artist?: string | null
   tag_string_character?: string | null
   tag_string_copyright?: string | null
+  tag_string_meta?: string | null
   media_asset?: MediaAsset | null
 }
 
@@ -56,6 +57,12 @@ export interface MediaItem {
   artists: string[]
   characters: string[]
   copyrights: string[]
+  /**
+   * Flags rather than content — `highres`, `absurdres`, `commentary_request`, `bad_id`.
+   * Kept only so the slide row can leave them out; `highres` alone covers 8.3M posts, and
+   * `bad_id` means the post's ID is wrong, so neither is worth browsing.
+   */
+  metaTags: string[]
   postId?: number
   sourceUrl?: string
   origin: 'danbooru' | 'custom'

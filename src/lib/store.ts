@@ -73,6 +73,7 @@ function normalizeItem(item: MediaItem): MediaItem {
     artists: Array.isArray(item.artists) ? item.artists : [],
     characters: Array.isArray(item.characters) ? item.characters : [],
     copyrights: Array.isArray(item.copyrights) ? item.copyrights : [],
+    metaTags: Array.isArray(item.metaTags) ? item.metaTags : [],
   }
 }
 

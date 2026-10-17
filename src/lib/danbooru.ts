@@ -18,6 +18,7 @@ const ONLY = [
   'tag_string_artist',
   'tag_string_character',
   'tag_string_copyright',
+  'tag_string_meta',
   'media_asset',
 ].join(',')
 
@@ -189,6 +190,7 @@ export function toItem(post: DanbooruPost): MediaItem | null {
     artists: splitTags(post.tag_string_artist),
     characters: splitTags(post.tag_string_character),
     copyrights: splitTags(post.tag_string_copyright),
+    metaTags: splitTags(post.tag_string_meta),
     postId: post.id,
     sourceUrl: `${API}/posts/${post.id}`,
     origin: 'danbooru',
@@ -311,6 +313,7 @@ function customItem(
     artists: [],
     characters: [],
     copyrights: [],
+    metaTags: [],
     ...base,
     ...extra,
     origin: 'custom',
