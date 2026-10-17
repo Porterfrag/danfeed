@@ -120,12 +120,17 @@ export async function connectToPage(port, { tries = 60 } = {}) {
  *   { match: 'cdn.donmai.us', image: PNG, contentLength: true } // served as an image
  *
  * A route may set `type` to override the content type (the screenshot harness serves SVG),
- * and `status` to answer with a failure instead of 200.
+ * `status` to answer with a failure instead of 200, `fail` to answer with that failure for the
+ * first N requests before behaving normally, and `failNetwork` to drop the connection for the
+ * first N — how a transient 5xx is staged for the retry tests.
  */
 export async function stubApi(cdp, routes, { requestStage = false } = {}) {
   await cdp.send('Fetch.enable', {
     patterns: [{ urlPattern: '*donmai.us*', ...(requestStage ? { requestStage: 'Request' } : {}) }],
   })
+
+  /** How many failures each route has handed out so far, for routes with a `fail` count. */
+  const served = new Map()
 
   return cdp.on(async (m) => {
     if (m.method !== 'Fetch.requestPaused') return
@@ -143,6 +148,38 @@ export async function stubApi(cdp, routes, { requestStage = false } = {}) {
 
     if (route.record) route.record.push(request.url)
 
+    const alreadyFailed = served.get(route) ?? 0
+    if (route.failNetwork && alreadyFailed < route.failNetwork) {
+      // A dropped connection rather than a bad answer: what a phone sees going through a tunnel.
+      served.set(route, alreadyFailed + 1)
+      try {
+        await cdp.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionFailed' })
+      } catch {
+        /* target navigated */
+      }
+      return
+    }
+
+    if (route.fail !== undefined && alreadyFailed < route.fail) {
+      served.set(route, alreadyFailed + 1)
+      try {
+        await cdp.send('Fetch.fulfillRequest', {
+          requestId,
+          responseCode: route.status ?? 503,
+          responseHeaders: [
+            { name: 'content-type', value: 'application/json' },
+            { name: 'access-control-allow-origin', value: '*' },
+          ],
+          body: Buffer.from(
+            JSON.stringify({ error: 'Server error', message: 'Danbooru is having a moment.' }),
+          ).toString('base64'),
+        })
+      } catch {
+        /* target navigated */
+      }
+      return
+    }
+
     const isJson = route.json !== undefined
     const body = isJson ? Buffer.from(JSON.stringify(route.json)).toString('base64') : route.image
     const headers = [
@@ -156,7 +193,10 @@ export async function stubApi(cdp, routes, { requestStage = false } = {}) {
     try {
       await cdp.send('Fetch.fulfillRequest', {
         requestId,
-        responseCode: route.status ?? 200,
+        // A `status` on its own means "always answer this way" — the error-card suites rely on it.
+        // With a `fail` count it describes only the first N answers, and the rest are the real
+        // thing, or a transient failure could never clear up.
+        responseCode: route.fail === undefined && route.status !== undefined ? route.status : 200,
         responseHeaders: headers,
         body,
       })
@@ -204,6 +244,89 @@ export const pressEnter = `(() => {
   )
   return 'ok'
 })()`
+
+/**
+ * Press a key at the document.
+ *
+ * The app's shortcuts listen on `window`, and the event is dispatched rather than typed through
+ * `Input.dispatchKeyEvent` so the browser keeps its own handling of the key: real keys like `/`
+ * (quick-find) and Ctrl+S (save page) are the browser's, and a suite that pressed them for real
+ * would be testing Chrome rather than the app.
+ *
+ * The event's target is the document, which is exactly the "nothing is focused" case the app
+ * guards for. A suite that wants the input-focused case dispatches on the input instead.
+ */
+export const pressKey = (key, init = {}) =>
+  `document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true, ...${JSON.stringify(init)} }))`
+
+/**
+ * Stand-in media behaviour for headless Chrome.
+ *
+ * The fixtures are a 1×1 PNG. Chrome cannot decode that as a video and has no decoder for
+ * anything a test could reasonably embed, so elements are given a truthful `paused` and a
+ * `play`/`pause` pair that report through the same events the app listens for. Their decode
+ * failure is kept away from the app, which would otherwise — correctly — put up its error card
+ * a moment later. `__playCalls` and `__pauseCalls` count the calls, which is what the
+ * reduced-motion test asserts on: the app's job is to call `play()`, not to decode.
+ *
+ * Installed with `Page.addScriptToEvaluateOnNewDocument`, so it runs before any app code. The
+ * capture listener on `window` runs before React's own, wherever React attached it.
+ */
+export const MEDIA_SHIM = `(() => {
+  window.__playCalls = 0
+  window.__pauseCalls = 0
+  HTMLMediaElement.prototype.play = function () {
+    window.__playCalls++
+    this.__paused = false
+    this.dispatchEvent(new Event('play', { bubbles: true }))
+    return Promise.resolve()
+  }
+  HTMLMediaElement.prototype.pause = function () {
+    window.__pauseCalls++
+    this.__paused = true
+    this.dispatchEvent(new Event('pause', { bubbles: true }))
+  }
+  Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+    configurable: true,
+    get() { return this.__paused ?? true },
+  })
+  window.addEventListener('error', (event) => {
+    if (event.target instanceof HTMLMediaElement) event.stopImmediatePropagation()
+  }, true)
+})()`
+
+/** Install MEDIA_SHIM for this page and every document it loads after. */
+export function installMediaShim(cdp) {
+  return cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: MEDIA_SHIM })
+}
+
+/**
+ * Click an element through the browser's own input pipeline.
+ *
+ * A programmatic `click()` never focuses the button, so it cannot be used to test anything about
+ * focus; this can. Needs `Emulation.setFocusEmulationEnabled`, since headless Chrome never gives
+ * the page system focus on its own.
+ */
+export async function mouseClick(cdp, selector) {
+  const at = await cdp.evalJS(`(() => {
+    const rect = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect()
+    return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) }
+  })()`)
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: at.x,
+    y: at.y,
+    button: 'left',
+    clickCount: 1,
+  })
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: at.x,
+    y: at.y,
+    button: 'left',
+    clickCount: 1,
+  })
+}
 
 const failures = []
 let pass = 0

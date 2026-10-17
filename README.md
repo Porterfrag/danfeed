@@ -49,6 +49,11 @@ deployment.
 | `tests/history.mjs` | recent searches: what is remembered, and what stays quiet |
 | `tests/backup.mjs` | exporting a backup file, and merging one back in |
 | `tests/share.mjs` | share links, `?q=` links, and the preview metadata crawlers read |
+| `tests/keyboard.mjs` | every shortcut, where it must stay quiet, and the sheets it opens |
+| `tests/tag-actions.mjs` | holding a chip: the sheet, the click it swallows, stacked sheets, Escape |
+| `tests/retry.mjs` | which failures are repeated and which are final, for the API and for media |
+| `tests/pwa.mjs` | the service worker, the shell it caches, and opening offline |
+| `tests/a11y.mjs` | reduced motion, the live region, the dialog contract, the feed's structure |
 
 ## Network requirement
 
@@ -72,13 +77,34 @@ Fix it with Secure DNS or a VPN:
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
 | Browsable tags | Every tag on a slide is one tap from a search; `+N` opens the full list |
+| Tag actions | Hold a tag chip — or right-click it — to search it here, open it on Danbooru, read its wiki, or copy the search link |
 | Rating | Safe by default; Moderate/Everything opt-in per browser |
 | Recent searches | An empty search box offers your last few searches; tap one to run it again |
 | Backup | Saved posts, recent searches and settings to one JSON file — and back in, merged |
 | Share | Copy the post link, the media link, or a `?q=` link that opens this search elsewhere |
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
 | Settings | Content rating, video size cap, start-with-sound, reset history |
-| Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save |
+| Keyboard | `↑`/`↓` or `j`/`k` scroll · `space` pause · `m` mute · `s` save — `?` lists the rest |
+| Failures | A dropped connection or a 5xx is retried twice before the error card; a 4xx is final |
+| Offline shell | A service worker keeps the app itself cached, so it opens without a network (the API and the media still need one) |
+| Motion | `prefers-reduced-motion` stops the autoplay, the gliding scroll and the sheet animations |
+
+## Keyboard
+
+| Key | |
+| --- | --- |
+| `↓` `j` | Next post |
+| `↑` `k` | Previous post |
+| `space` | Play or pause the video |
+| `s` | Save the post |
+| `m` | Mute or unmute |
+| `o` | Open the original source |
+| `/` | Jump to the search box |
+| `h` | Back to the default feed |
+| `?` | This list, in the app |
+
+Shortcuts stay out of the way while the search box has focus or a sheet is open, and `Escape`
+closes whatever is in front.
 
 ## Licence
 

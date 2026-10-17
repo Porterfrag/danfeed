@@ -6,8 +6,13 @@ import { SettingsSheet } from './components/SettingsSheet'
 import type { RestoreOutcome } from './components/SettingsSheet'
 import { SavedSheet } from './components/SavedSheet'
 import { ShareSheet } from './components/ShareSheet'
+import { ShortcutsSheet } from './components/ShortcutsSheet'
+import { TagActionsSheet } from './components/TagActionsSheet'
+import type { TagTarget } from './components/TagActionsSheet'
 import { TagsSheet } from './components/TagsSheet'
+import { LiveRegion } from './components/LiveRegion'
 import { useFeed } from './hooks/useFeed'
+import { announce } from './lib/announce'
 import {
   buildBackup,
   loadRecent,
@@ -70,6 +75,9 @@ export default function App() {
   const [tagsItem, setTagsItem] = useState<MediaItem | null>(null)
   /** The post whose share sheet is open, if any. */
   const [shareItem, setShareItem] = useState<MediaItem | null>(null)
+  /** The tag whose actions sheet is open, if any. */
+  const [tagTarget, setTagTarget] = useState<TagTarget | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [scrollSignal, setScrollSignal] = useState(0)
 
   useEffect(() => {
@@ -90,17 +98,47 @@ export default function App() {
     if (initialQuery) history.replaceState(null, '', location.pathname)
   }, [initialQuery])
 
+  /**
+   * What the tab, the bookmark and the history entry say.
+   *
+   * The address bar deliberately stops carrying the query once a shared link has been read, so
+   * the title is the only thing a browser remembers about which search a tab is showing — and
+   * with several tabs open, it is the only way to tell them apart.
+   */
+  useEffect(() => {
+    const query = feed.queryInput.trim()
+    document.title = query ? `${query} — danfeed` : 'danfeed'
+  }, [feed.queryInput])
+
   const muted = !settings.unmute
+
+  /**
+   * Whether anything is in front of the feed.
+   *
+   * Drives two things at once: the feed's keyboard shortcuts stand down, and the feed itself is
+   * made `inert`, so Tab and a screen reader cannot wander into slides hidden behind a sheet.
+   * The sheets are siblings of the feed, not children, or this would disable them too.
+   */
+  const sheetOpen =
+    sheet !== null || tagsItem !== null || shareItem !== null || tagTarget !== null || shortcutsOpen
 
   const savedKeys = useMemo(() => new Set(saved.map((item) => item.key)), [saved])
 
-  const toggleSave = useCallback((item: MediaItem) => {
-    setSaved((prev) =>
-      prev.some((entry) => entry.key === item.key)
-        ? prev.filter((entry) => entry.key !== item.key)
-        : [item, ...prev],
-    )
-  }, [])
+  const toggleSave = useCallback(
+    (item: MediaItem) => {
+      // Read before the update: the setter's function form keeps this callback render-independent
+      // of `saved`, but the announcement has to happen outside it, and it needs to know which way
+      // the tap went.
+      const already = saved.some((entry) => entry.key === item.key)
+      setSaved((prev) =>
+        prev.some((entry) => entry.key === item.key)
+          ? prev.filter((entry) => entry.key !== item.key)
+          : [item, ...prev],
+      )
+      announce(already ? 'Removed from your list' : 'Saved to your list')
+    },
+    [saved],
+  )
 
   const toggleMute = useCallback(() => {
     setSettings((prev) => ({ ...prev, unmute: !prev.unmute }))
@@ -135,10 +173,13 @@ export default function App() {
       const mergedRecent = mergeRecent(recent, backup.recent)
       setRecent(mergedRecent)
 
+      const newRecent = mergedRecent.filter((entry) => !before.has(entry)).length
+      announce(`Backup merged: ${merged.added} new saved posts, ${newRecent} new searches.`)
+
       return {
         added: merged.added,
         duplicates: merged.duplicates,
-        recent: mergedRecent.filter((entry) => !before.has(entry)).length,
+        recent: newRecent,
       }
     },
     [saved, recent],
@@ -153,6 +194,8 @@ export default function App() {
     setSheet(null)
     setTagsItem(null)
     setShareItem(null)
+    setTagTarget(null)
+    setShortcutsOpen(false)
     setScrollSignal((n) => n + 1)
     resetToDefault()
   }, [resetToDefault])
@@ -176,41 +219,51 @@ export default function App() {
 
   return (
     <>
-      <Feed
-        items={items}
-        loading={feed.loading}
-        error={feed.error}
-        hasMore={feed.hasMore}
-        onLoadMore={feed.loadMore}
-        onRetry={feed.retry}
-        onClearHistory={feed.clearHistory}
-        tagLimit={feed.tagLimit}
-        onRemoveTag={feed.removeTag}
-        onClearSearch={() => {
-          feed.setQueryInput('')
-          feed.setChip('all')
-        }}
-        chip={feed.chip}
-        setChip={feed.setChip}
-        queryInput={feed.queryInput}
-        setQueryInput={feed.setQueryInput}
-        savedKeys={savedKeys}
-        onSave={toggleSave}
-        muted={muted}
-        onToggleMute={toggleMute}
-        maxBytes={maxBytes}
-        scrollToTopSignal={scrollSignal}
-        onAddClick={() => setSheet('add')}
-        onSavedClick={() => setSheet('saved')}
-        onSettingsClick={() => setSheet('settings')}
-        onHomeClick={goHome}
-        nsfw={settings.rating !== 'general'}
-        onTagClick={browseTag}
-        onShowAllTags={setTagsItem}
-        recents={recent}
-        onClearRecents={() => setRecent([])}
-        onShare={setShareItem}
-      />
+      {/* `inert` while anything is in front: Tab and a screen reader stop at the sheet, and the
+          slides behind it stop being reachable. The sheets are siblings, not children. */}
+      <div inert={sheetOpen} className="h-dvh">
+        <Feed
+          items={items}
+          loading={feed.loading}
+          error={feed.error}
+          hasMore={feed.hasMore}
+          onLoadMore={feed.loadMore}
+          onRetry={feed.retry}
+          onClearHistory={feed.clearHistory}
+          tagLimit={feed.tagLimit}
+          onRemoveTag={feed.removeTag}
+          onClearSearch={() => {
+            feed.setQueryInput('')
+            feed.setChip('all')
+          }}
+          chip={feed.chip}
+          setChip={feed.setChip}
+          queryInput={feed.queryInput}
+          setQueryInput={feed.setQueryInput}
+          savedKeys={savedKeys}
+          onSave={toggleSave}
+          muted={muted}
+          onToggleMute={toggleMute}
+          maxBytes={maxBytes}
+          scrollToTopSignal={scrollSignal}
+          onAddClick={() => setSheet('add')}
+          onSavedClick={() => setSheet('saved')}
+          onSettingsClick={() => setSheet('settings')}
+          onHomeClick={goHome}
+          nsfw={settings.rating !== 'general'}
+          onTagClick={browseTag}
+          onTagActions={setTagTarget}
+          onShowAllTags={setTagsItem}
+          recents={recent}
+          onClearRecents={() => {
+            setRecent([])
+            announce('Recent searches cleared')
+          }}
+          onShare={setShareItem}
+          onShowShortcuts={() => setShortcutsOpen(true)}
+          shortcutsEnabled={!sheetOpen}
+        />
+      </div>
 
       <AddUrlSheet
         open={sheet === 'add'}
@@ -226,7 +279,10 @@ export default function App() {
           addItem(item)
           setSheet(null)
         }}
-        onRemove={(key) => setSaved((prev) => prev.filter((entry) => entry.key !== key))}
+        onRemove={(key) => {
+          setSaved((prev) => prev.filter((entry) => entry.key !== key))
+          announce('Removed from your list')
+        }}
       />
 
       <SettingsSheet
@@ -235,7 +291,10 @@ export default function App() {
         settings={settings}
         onChange={setSettings}
         savedCount={saved.length}
-        onClearSaved={() => setSaved([])}
+        onClearSaved={() => {
+          setSaved([])
+          announce('Saved list cleared')
+        }}
         onClearHistory={feed.clearHistory}
         onExport={exportBackup}
         onRestore={restoreBackup}
@@ -255,7 +314,24 @@ export default function App() {
           setTagsItem(null)
           browseTag(tag)
         }}
+        onActions={setTagTarget}
       />
+
+      <TagActionsSheet
+        target={tagTarget}
+        onClose={() => setTagTarget(null)}
+        onSearch={(tag) => {
+          // The sheet may have been opened from the all-tags list, which is now showing a post
+          // that is no longer the one on screen.
+          setTagsItem(null)
+          setTagTarget(null)
+          browseTag(tag)
+        }}
+      />
+
+      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+      <LiveRegion />
     </>
   )
 }

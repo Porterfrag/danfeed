@@ -29,9 +29,14 @@ interface Props {
   /** Past searches, newest first. Offered when the box is empty and focused. */
   recents: string[]
   onClearRecents: () => void
+  /**
+   * Bumped by the `/` shortcut. A counter rather than a flag so that pressing it twice in a row
+   * both do something — the second press should focus the box again after the first was blurred.
+   */
+  focusSignal: number
 }
 
-export function TagSearch({ value, onChange, recents, onClearRecents }: Props) {
+export function TagSearch({ value, onChange, recents, onClearRecents, focusSignal }: Props) {
   const [items, setItems] = useState<TagSuggestion[]>([])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
@@ -64,6 +69,13 @@ export function TagSearch({ value, onChange, recents, onClearRecents }: Props) {
    * the box yet, so a seeded search counts as set-from-outside and comes up quietly.
    */
   const typedRef = useRef('')
+
+  // `/` from anywhere in the feed. Done imperatively rather than with autoFocus, which would
+  // steal the caret on every mount — and this box mounts once, behind the whole feed.
+  useEffect(() => {
+    if (focusSignal === 0) return
+    inputRef.current?.focus()
+  }, [focusSignal])
 
   // Complete only the word being typed, keeping earlier tags intact.
   const { token } = splitQuery(value)

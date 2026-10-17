@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaItem } from '../types'
 import { BooruError, searchPosts } from '../lib/danbooru'
+import { announce } from '../lib/announce'
 import { analyzeTags, buildTags, removeToken, TAG_LIMIT, tokenize } from '../lib/tagQuery'
 import type { RatingLevel } from '../lib/tagQuery'
 
@@ -92,6 +93,10 @@ export function useFeed(rating: RatingLevel, { onSearch, initialQuery = '' }: Fe
     setLoading(true)
     setError(null)
 
+    // The first page of a generation replaces the feed; later pages extend it. Only the first is
+    // worth announcing — a running total read out on every scroll would be noise.
+    const firstPage = cursorRef.current === null
+
     const gen = genRef.current
     // Marks that this call owns the loading flag, so a superseded call can still release it.
     let ownedLoading = true
@@ -128,6 +133,7 @@ export function useFeed(rating: RatingLevel, { onSearch, initialQuery = '' }: Fe
       if (collected.length === 0) {
         hasMoreRef.current = false
         setHasMore(false)
+        if (firstPage) announce('Nothing new here.')
         return
       }
 
@@ -135,6 +141,10 @@ export function useFeed(rating: RatingLevel, { onSearch, initialQuery = '' }: Fe
       hasMoreRef.current = !exhausted
       setHasMore(!exhausted)
       setItems((prev) => [...prev, ...collected])
+
+      if (firstPage) {
+        announce(`${collected.length} ${collected.length === 1 ? 'post' : 'posts'}`)
+      }
 
       for (const item of collected) seenRef.current.add(item.key)
     } catch (caught) {
@@ -241,8 +251,15 @@ export function useFeed(rating: RatingLevel, { onSearch, initialQuery = '' }: Fe
     }
 
     setTagLimit(null)
+
+    // The feed is about to be replaced under whatever the user was looking at. Say what is
+    // coming; the count lands a moment later from the first page.
+    if (query.trim()) announce(`Searching ${query.trim()}`)
+    else if (chipTags) announce(`Searching ${CHIPS.find((c) => c.id === chip)?.label ?? 'the feed'}`)
+    else announce('Loading the default feed')
+
     void loadMore()
-  }, [tags, chipTags, reset, loadMore, homeSignal])
+  }, [tags, chipTags, reset, loadMore, homeSignal, query, chip])
 
   return {
     items,

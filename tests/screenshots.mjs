@@ -174,6 +174,25 @@ async function main() {
   })()`)
   await sleep(300)
   await c.shot(join(OUT, 'backup.png'))
+
+  // A tag's own actions: what a long press on a chip opens. Reached by right-click here, which
+  // is the same gesture done with a mouse.
+  await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
+  await sleep(350)
+  await c.evalJS(
+    `document.querySelector('[data-slide] [aria-label^="Show more by artist"]').dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    )`,
+  )
+  await sleep(400)
+  await c.shot(join(OUT, 'tag-actions.png'))
+  await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
+  await sleep(300)
+
+  // The keyboard map.
+  await c.evalJS(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }))`)
+  await sleep(400)
+  await c.shot(join(OUT, 'shortcuts.png'))
 }
 
 main()

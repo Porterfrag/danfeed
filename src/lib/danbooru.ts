@@ -26,12 +26,29 @@ export type BooruErrorKind = 'blocked' | 'http' | 'network' | 'rate' | 'input' |
 
 export class BooruError extends Error {
   kind: BooruErrorKind
+  /** The HTTP status, when there was one. Decides whether the failure is worth repeating. */
+  status?: number
 
-  constructor(kind: BooruErrorKind, message: string) {
+  constructor(kind: BooruErrorKind, message: string, status?: number) {
     super(message)
     this.name = 'BooruError'
     this.kind = kind
+    this.status = status
   }
+}
+
+/**
+ * Statuses worth another go. Danbooru restarts and sheds load with these; the answer to the same
+ * question a moment later is usually a good one.
+ */
+const RETRY_STATUSES = new Set([500, 502, 503, 504])
+/** Backoff between attempts, plus jitter. Two retries: three requests in all. */
+const RETRY_DELAYS = [400, 1200]
+
+function isTransient(error: unknown): boolean {
+  if (!(error instanceof BooruError)) return false
+  if (error.kind === 'network') return true
+  return error.status !== undefined && RETRY_STATUSES.has(error.status)
 }
 
 /* ------------------------------------------------------------------ */
@@ -63,7 +80,7 @@ const schedule = makeScheduler(350)
 /** Autocomplete — needs to feel instant, still rate-limit friendly. */
 const scheduleFast = makeScheduler(150)
 
-async function getJson<T>(url: string): Promise<T> {
+async function getOnce<T>(url: string): Promise<T> {
   let res: Response
   try {
     res = await fetch(url, {
@@ -76,7 +93,11 @@ async function getJson<T>(url: string): Promise<T> {
   }
 
   if (res.status === 429) {
-    throw new BooruError('rate', 'Danbooru is rate-limiting requests. Pausing for a moment.')
+    throw new BooruError(
+      'rate',
+      'Danbooru is rate-limiting requests. Pausing for a moment.',
+      res.status,
+    )
   }
   if (!res.ok) {
     // Danbooru returns a JSON error body; surface its message rather than a bare status code.
@@ -91,12 +112,13 @@ async function getJson<T>(url: string): Promise<T> {
       throw new BooruError(
         'taglimit',
         payload.message ?? 'You cannot search for more than 2 tags at a time.',
+        res.status,
       )
     }
     if (payload?.message) {
-      throw new BooruError('http', payload.message)
+      throw new BooruError('http', payload.message, res.status)
     }
-    throw new BooruError('http', `Danbooru responded with HTTP ${res.status}.`)
+    throw new BooruError('http', `Danbooru responded with HTTP ${res.status}.`, res.status)
   }
 
   const contentType = res.headers.get('content-type') ?? ''
@@ -112,6 +134,38 @@ async function getJson<T>(url: string): Promise<T> {
     return (await res.json()) as T
   } catch {
     throw new BooruError('blocked', 'Could not parse the response from Danbooru.')
+  }
+}
+
+/**
+ * Fetch JSON, with a couple of extra goes at transient failures.
+ *
+ * Danbooru answers 502/503 while it restarts and truncates under load, and a phone moving
+ * between networks drops connections; none of that deserves an error card when the same GET a
+ * moment later would have worked. 4xx is never repeated — a rejected query is rejected the same
+ * way every time — and neither is the typing path, where a late answer is worth less than a
+ * quick one, so autocomplete opts out.
+ */
+async function getJson<T>(url: string, { retry = true }: { retry?: boolean } = {}): Promise<T> {
+  const delays = retry ? RETRY_DELAYS : []
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await getOnce<T>(url)
+    } catch (error) {
+      if (attempt >= delays.length || !isTransient(error)) {
+        if (attempt > 0 && error instanceof BooruError) {
+          // Say that it tried more than once, or the wait before the card reads as a hang.
+          throw new BooruError(
+            error.kind,
+            `${error.message} Tried ${attempt + 1} times.`,
+            error.status,
+          )
+        }
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt] + Math.random() * 150))
+    }
   }
 }
 
@@ -267,7 +321,7 @@ export async function autocompleteTags(query: string, limit = 8): Promise<TagSug
     `${API}/autocomplete.json?search%5Bquery%5D=${encodeURIComponent(q)}` +
     `&search%5Btype%5D=tag&limit=${limit}`
 
-  const rows = await scheduleFast(() => getJson<AutocompleteRow[]>(url))
+  const rows = await scheduleFast(() => getJson<AutocompleteRow[]>(url, { retry: false }))
   if (!Array.isArray(rows)) return []
 
   return rows

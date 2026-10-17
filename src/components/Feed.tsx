@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem } from '../types'
 import type { BooruError } from '../lib/danbooru'
+import { announce } from '../lib/announce'
+import { useReducedMotion } from '../lib/useReducedMotion'
 import { CHIPS } from '../hooks/useFeed'
 import type { ChipId } from '../hooks/useFeed'
 import logoMark from '../assets/logo-mark.jpg'
@@ -8,8 +10,9 @@ import { PostView } from './PostView'
 import { TagSearch } from './TagSearch'
 import { TagLimitNotice } from './TagLimitNotice'
 import { Diagnostic } from './Diagnostic'
-import { IconAlert, IconBookmark, IconGear, IconPlus } from './icons'
+import { IconAlert, IconBookmark, IconGear, IconKeyboard, IconPlus } from './icons'
 import type { TagLimitState } from '../hooks/useFeed'
+import type { TagTarget } from './TagActionsSheet'
 
 interface Props {
   items: MediaItem[]
@@ -38,8 +41,17 @@ interface Props {
   onHomeClick: () => void
   /** Search one tag, whichever category it belongs to. */
   onTagClick: (tag: string) => void
+  /** Open the actions sheet for one tag. */
+  onTagActions: (target: TagTarget) => void
   /** Open the full tag list for a post. */
   onShowAllTags: (item: MediaItem) => void
+  /** Open the keyboard help. */
+  onShowShortcuts: () => void
+  /**
+   * False while a sheet is open. The sheet's own Escape and Tab handling is the only keyboard
+   * behaviour that makes sense then; grading the post underneath it does not.
+   */
+  shortcutsEnabled: boolean
   /** True when the feed is allowed past the general rating. Drives the settings badge. */
   nsfw: boolean
   /** Past searches, newest first, for the box's history panel. */
@@ -76,7 +88,10 @@ export function Feed({
   onHomeClick,
   nsfw,
   onTagClick,
+  onTagActions,
   onShowAllTags,
+  onShowShortcuts,
+  shortcutsEnabled,
   recents,
   onClearRecents,
   onShare,
@@ -84,6 +99,9 @@ export function Feed({
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(0)
+  /** Bumped by the `/` shortcut; TagSearch focuses its input when it changes. */
+  const [focusSignal, setFocusSignal] = useState(0)
+  const reduced = useReducedMotion()
 
   // Which slide owns the screen decides who plays.
   useEffect(() => {
@@ -117,14 +135,20 @@ export function Feed({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onLoadMore()
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        // With an error on screen and nothing loaded, the observer is firing at the empty layout
+        // rather than at anything the user scrolled to. Loading again would be a blind retry of
+        // the request that just failed — often one whose answer will not change — and the error
+        // card is already offering the way back.
+        if (error !== null && items.length === 0) return
+        onLoadMore()
       },
       { root, rootMargin: '800px 0px' },
     )
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [onLoadMore, items.length])
+  }, [onLoadMore, items.length, error])
 
   useEffect(() => {
     if (scrollToTopSignal === 0) return
@@ -132,77 +156,147 @@ export function Feed({
     setActive(0)
   }, [scrollToTopSignal])
 
+  /**
+   * The keyboard layer.
+   *
+   * Deaf by design while a text field has focus, while a sheet is in front, and to anything with
+   * a modifier held: those keys belong to the browser, and a `j` inside a character being built
+   * by an input method is not a navigation command either.
+   */
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return
+      if (!shortcutsEnabled) return
+
       const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      if (target?.isContentEditable) return
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
 
       const root = scrollerRef.current
       if (!root) return
 
-      if (e.key === 'ArrowDown' || e.key === 'j') {
-        e.preventDefault()
-        root.scrollBy({ top: root.clientHeight, behavior: 'smooth' })
-      } else if (e.key === 'ArrowUp' || e.key === 'k') {
-        e.preventDefault()
-        root.scrollBy({ top: -root.clientHeight, behavior: 'smooth' })
-      } else if (e.key === ' ') {
-        e.preventDefault()
-        const video = root.querySelector<HTMLVideoElement>(
-          `[data-slide][data-index="${active}"] video`,
-        )
-        if (video) {
-          if (video.paused) void video.play().catch(() => undefined)
-          else video.pause()
+      const item = items[active]
+      // Snap scrolling still snaps — that is navigation, not decoration — but it stops gliding.
+      const behavior: ScrollBehavior = reduced ? 'auto' : 'smooth'
+
+      switch (e.key) {
+        case 'ArrowDown':
+        case 'j':
+        case 'J':
+          e.preventDefault()
+          root.scrollBy({ top: root.clientHeight, behavior })
+          break
+        case 'ArrowUp':
+        case 'k':
+        case 'K':
+          e.preventDefault()
+          root.scrollBy({ top: -root.clientHeight, behavior })
+          break
+        case ' ': {
+          e.preventDefault()
+          const video = root.querySelector<HTMLVideoElement>(
+            `[data-slide][data-index="${active}"] video`,
+          )
+          if (video) {
+            if (video.paused) {
+              void video.play().catch(() => undefined)
+              announce('Playing')
+            } else {
+              video.pause()
+              announce('Paused')
+            }
+          }
+          break
         }
-      } else if (e.key === 'm' || e.key === 'M') {
-        onToggleMute()
-      } else if (e.key === 's' || e.key === 'S') {
-        const item = items[active]
-        if (item) onSave(item)
+        case 'm':
+        case 'M':
+          onToggleMute()
+          break
+        case 's':
+        case 'S':
+          if (item) onSave(item)
+          break
+        case 'o':
+        case 'O':
+          if (item?.sourceUrl) window.open(item.sourceUrl, '_blank', 'noopener')
+          break
+        case '/':
+          // Without this, Firefox opens its quick-find bar instead.
+          e.preventDefault()
+          setFocusSignal((n) => n + 1)
+          break
+        case 'h':
+        case 'H':
+          onHomeClick()
+          break
+        case '?':
+          e.preventDefault()
+          onShowShortcuts()
+          break
+        default:
+          break
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [active, items, onSave, onToggleMute])
+  }, [
+    active,
+    items,
+    onSave,
+    onToggleMute,
+    onHomeClick,
+    onShowShortcuts,
+    reduced,
+    shortcutsEnabled,
+  ])
 
   const empty = !loading && items.length === 0 && !tagLimit
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
-      <div
-        ref={scrollerRef}
-        className="no-scrollbar h-full w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
-      >
-        {items.map((item, index) => (
-          <div
-            key={item.key}
-            data-slide
-            data-index={index}
-            className="h-dvh w-full snap-start snap-always"
-          >
-            <PostView
-              item={item}
-              index={index}
-              active={index === active}
-              distance={Math.abs(index - active)}
-              saved={savedKeys.has(item.key)}
-              muted={muted}
-              maxBytes={maxBytes}
-              onSave={onSave}
-              onToggleMute={onToggleMute}
-              onTagClick={onTagClick}
-              onShowAllTags={onShowAllTags}
-              onShare={onShare}
-            />
-          </div>
-        ))}
-        <div ref={sentinelRef} className="h-2 w-full" />
-      </div>
+      <main className="h-full w-full">
+        <div
+          ref={scrollerRef}
+          role="feed"
+          aria-label="Posts"
+          aria-busy={loading}
+          className="no-scrollbar h-full w-full snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
+        >
+          {items.map((item, index) => (
+            <div
+              key={item.key}
+              data-slide
+              data-index={index}
+              role="article"
+              aria-posinset={index + 1}
+              aria-setsize={items.length}
+              aria-label={`Post ${index + 1} of ${items.length}`}
+              className="h-dvh w-full snap-start snap-always"
+            >
+              <PostView
+                item={item}
+                index={index}
+                active={index === active}
+                distance={Math.abs(index - active)}
+                saved={savedKeys.has(item.key)}
+                muted={muted}
+                maxBytes={maxBytes}
+                onSave={onSave}
+                onToggleMute={onToggleMute}
+                onTagClick={onTagClick}
+                onTagActions={onTagActions}
+                onShowAllTags={onShowAllTags}
+                onShare={onShare}
+              />
+            </div>
+          ))}
+          <div ref={sentinelRef} className="h-2 w-full" />
+        </div>
+      </main>
 
       {/* Header */}
-      <div className="safe-t pointer-events-none absolute inset-x-0 top-0 z-30">
+      <header className="safe-t pointer-events-none absolute inset-x-0 top-0 z-30">
         <div className="pointer-events-auto bg-gradient-to-b from-black/80 via-black/40 to-transparent px-3 pb-3 pt-2">
           <div className="flex items-center gap-2">
             <button
@@ -231,6 +325,7 @@ export function Feed({
               onChange={setQueryInput}
               recents={recents}
               onClearRecents={onClearRecents}
+              focusSignal={focusSignal}
             />
 
             <button
@@ -262,6 +357,17 @@ export function Feed({
                 <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-black bg-amber-400" />
               )}
             </button>
+            {/* Only where a keyboard can be assumed: on a phone the icon would be a mystery
+                and the width is already spoken for. */}
+            <button
+              type="button"
+              onClick={onShowShortcuts}
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white sm:flex"
+            >
+              <IconKeyboard className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto">
@@ -281,7 +387,7 @@ export function Feed({
             ))}
           </div>
         </div>
-      </div>
+      </header>
 
       {/* First-load spinner */}
       {loading && items.length === 0 && (
@@ -322,7 +428,7 @@ export function Feed({
 
       {/* Soft failure: keep what we have, offer a retry */}
       {items.length > 0 && error && (
-        <div className="safe-b absolute inset-x-3 bottom-16 z-40">
+        <div className="safe-b absolute inset-x-3 bottom-16 z-40" role="status">
           <div className="df-fade-up flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-500/15 p-3 backdrop-blur-md">
             <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <p className="flex-1 text-xs leading-relaxed text-amber-100">{error.message}</p>

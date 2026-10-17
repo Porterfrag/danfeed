@@ -32,7 +32,20 @@ import {
 } from './lib/browser.mjs'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
-const SUITES = ['tags', 'entities', 'rating', 'search-panel', 'history', 'backup', 'share']
+const SUITES = [
+  'tags',
+  'entities',
+  'rating',
+  'search-panel',
+  'history',
+  'backup',
+  'share',
+  'keyboard',
+  'tag-actions',
+  'retry',
+  'pwa',
+  'a11y',
+]
 const SUITE_TIMEOUT_MS = Number(process.env.SUITE_TIMEOUT_MS || 240_000)
 
 const argv = process.argv.slice(2)

@@ -33,6 +33,11 @@
 /manifest.webmanifest
   Cache-Control: public, max-age=86400
 
+# The service worker registers itself on every load, so its own copy must revalidate:
+# a stale worker would keep serving the old rules and never see a new deploy.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
 # Baseline hardening.
 #
 # Deliberately no Content-Security-Policy: the app pulls images and video from

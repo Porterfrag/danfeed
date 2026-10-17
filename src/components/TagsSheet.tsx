@@ -1,7 +1,9 @@
 import type { MediaItem } from '../types'
 import { tagLabel } from '../lib/danbooru'
 import { categoriesOf } from '../lib/tagCategories'
+import { useLongPress } from '../lib/useLongPress'
 import { Sheet } from './Sheet'
+import type { TagTarget } from './TagActionsSheet'
 import { IconChevronRight } from './icons'
 
 interface Props {
@@ -10,6 +12,55 @@ interface Props {
   onClose: () => void
   /** Search one tag, whichever category it belongs to. */
   onPick: (tag: string) => void
+  /** Open the actions sheet for one tag: the same hold the slide chips answer to. */
+  onActions: (target: TagTarget) => void
+}
+
+/** Danbooru's `copyright` family is a series to anyone reading a row. */
+const KIND: Record<string, TagTarget['kind']> = {
+  artist: 'artist',
+  character: 'character',
+  copyright: 'series',
+}
+
+/**
+ * One tag in the list. Tap searches, hold offers the rest — the same two gestures the chips on
+ * a slide have, because this sheet is where the tags that did not fit are, and so where the
+ * second action is wanted most.
+ */
+function TagRow({
+  tag,
+  kind,
+  onPick,
+  onActions,
+}: {
+  tag: string
+  kind: TagTarget['kind']
+  onPick: (tag: string) => void
+  onActions: (target: TagTarget) => void
+}) {
+  const { holding, handlers } = useLongPress(() => onActions({ tag, kind }))
+
+  return (
+    <button
+      type="button"
+      {...handlers}
+      onClick={(e) => {
+        handlers.onClick(e)
+        if (e.defaultPrevented) return
+        onPick(tag)
+      }}
+      aria-label={`Search ${tagLabel(tag)}`}
+      aria-haspopup="dialog"
+      title="Hold or right-click for tag actions"
+      className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-2.5 text-left transition active:bg-white/15 ${
+        holding ? 'bg-white/15' : 'hover:bg-white/10'
+      }`}
+    >
+      <span className="min-w-0 flex-1 truncate text-sm text-white/90">{tagLabel(tag)}</span>
+      <IconChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+    </button>
+  )
 }
 
 /**
@@ -23,7 +74,7 @@ interface Props {
  * Tags are shown with underscores read as spaces but searched in their canonical underscored
  * form — the same label/value split the autocomplete follows.
  */
-export function TagsSheet({ item, onClose, onPick }: Props) {
+export function TagsSheet({ item, onClose, onPick, onActions }: Props) {
   const groups = item ? categoriesOf(item) : []
   const total = groups.reduce((sum, group) => sum + group.tags.length, 0)
 
@@ -47,17 +98,12 @@ export function TagsSheet({ item, onClose, onPick }: Props) {
               <ul>
                 {group.tags.map((tag) => (
                   <li key={tag}>
-                    <button
-                      type="button"
-                      onClick={() => onPick(tag)}
-                      aria-label={`Search ${tagLabel(tag)}`}
-                      className="flex min-h-11 w-full items-center gap-2 rounded-xl px-2.5 text-left transition hover:bg-white/10 active:bg-white/15"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-sm text-white/90">
-                        {tagLabel(tag)}
-                      </span>
-                      <IconChevronRight className="h-4 w-4 shrink-0 text-white/30" />
-                    </button>
+                    <TagRow
+                      tag={tag}
+                      kind={KIND[group.key] ?? null}
+                      onPick={onPick}
+                      onActions={onActions}
+                    />
                   </li>
                 ))}
               </ul>

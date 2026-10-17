@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "danfeed",
   "short_name": "danfeed",
   "description": "A vertical, swipeable feed of Danbooru media.",

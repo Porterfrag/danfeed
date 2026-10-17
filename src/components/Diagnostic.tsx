@@ -15,8 +15,10 @@ const STEPS = [
 export function Diagnostic({ error, onRetry }: Props) {
   const blocked = error.kind === 'blocked' || error.kind === 'network'
 
+  // `role="alert"`: this replaces the whole feed, and there is nothing else on screen left to
+  // explain what happened. Announced, rather than left for a screen reader to stumble into.
   return (
-    <div className="flex h-full w-full items-center justify-center bg-black px-6">
+    <div role="alert" className="flex h-full w-full items-center justify-center bg-black px-6">
       <div className="w-full max-w-md">
         <div className="mb-4 flex items-center gap-2 text-amber-300">
           <IconAlert className="h-5 w-5" />

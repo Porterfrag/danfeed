@@ -68,3 +68,21 @@ body {
 .df-spin {
   animation: df-spin 700ms linear infinite;
 }
+
+/*
+ * Less motion, asked for at the system level.
+ *
+ * The fades and the sheet's slide-up are decoration, so they go. The spinner keeps its shape and
+ * loses its rotation — "loading" still has to be visible, it just does not have to spin.
+ * Scrolling and video autoplay are handled in the components, where they can be tied to the
+ * setting as it changes rather than to a rule that only the stylesheet can see.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .df-fade-up,
+  .df-fade-in {
+    animation: none;
+  }
+  .df-spin {
+    animation: none;
+  }
+}

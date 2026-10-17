@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { MediaItem } from '../types'
-import { tagLabel } from '../lib/danbooru'
 import { TAG_CATEGORY } from '../lib/tagCategories'
 import type { TagCategoryKey } from '../lib/tagCategories'
+import { useReducedMotion } from '../lib/useReducedMotion'
 import { useZoom } from '../lib/useZoom'
+import { TagChip } from './TagChip'
+import type { TagTarget } from './TagActionsSheet'
 import {
   IconBookmark,
   IconChevronRight,
@@ -27,6 +29,8 @@ interface Props {
   onToggleMute: () => void
   /** Search one tag, whichever category it belongs to. */
   onTagClick: (tag: string) => void
+  /** Open the actions sheet for one tag: what a long press or a right-click on a chip asks for. */
+  onTagActions: (target: TagTarget) => void
   /** Open the full tag list for this post. */
   onShowAllTags: (item: MediaItem) => void
   /** Open the share sheet for this post. */
@@ -54,6 +58,13 @@ const ROW_CAPS: Record<TagCategoryKey, number> = {
 
 /** The families that get a dot and a chevron in the row above the general tags. */
 const ROW_ENTITY_KEYS: TagCategoryKey[] = ['artist', 'character', 'copyright']
+
+/** Danbooru's `copyright` family is a series to anyone reading a slide. */
+const ENTITY_KIND: Record<string, TagTarget['kind']> = {
+  artist: 'artist',
+  character: 'character',
+  copyright: 'series',
+}
 
 /**
  * The "+N" standing in for the tags a row is not showing. Tapping it opens the full list, which
@@ -93,6 +104,23 @@ function formatBytes(bytes?: number) {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
 }
 
+/**
+ * The same media URL with a retry marker on it.
+ *
+ * Asking the element for the URL that just failed can be answered out of the cache that already
+ * held the failure, so the retry changes the query instead. The CDN ignores parameters it does
+ * not know, and the browser treats it as a request it has never seen.
+ */
+function retryUrl(url: string, attempt: number) {
+  try {
+    const next = new URL(url)
+    next.searchParams.set('df-retry', String(attempt))
+    return next.toString()
+  } catch {
+    return url
+  }
+}
+
 export function PostView({
   item,
   index,
@@ -104,6 +132,7 @@ export function PostView({
   onSave,
   onToggleMute,
   onTagClick,
+  onTagActions,
   onShowAllTags,
   onShare,
 }: Props) {
@@ -115,6 +144,11 @@ export function PostView({
   const [forced, setForced] = useState(false)
   const [paused, setPaused] = useState(true)
   const [progress, setProgress] = useState(0)
+  /** Bumped to point the element at a fresh URL. See `retryUrl`. */
+  const [attempt, setAttempt] = useState(0)
+  const retried = useRef(false)
+  const retryTimer = useRef<number | null>(null)
+  const reduced = useReducedMotion()
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -142,12 +176,46 @@ export function PostView({
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    if (active && !gated) {
+    // Nothing starts on its own when less motion has been asked for: a video playing itself is
+    // what that setting is about. The play overlay stays one tap away.
+    if (active && !gated && !reduced) {
       void video.play().catch(() => setPaused(true))
     } else {
       video.pause()
     }
-  }, [active, gated, item.key])
+  }, [active, gated, item.key, reduced])
+
+  /**
+   * One quiet retry, then the error card.
+   *
+   * The media CDN answers 5xx when it is shedding load, and browsers keep the failure: a retry
+   * on the same URL can be served straight out of the cache that recorded it. Waiting a moment
+   * and asking on a URL the browser has never seen is what actually gets a second answer.
+   */
+  const handleMediaError = useCallback(() => {
+    if (retried.current) {
+      setFailed(true)
+      return
+    }
+    retried.current = true
+    retryTimer.current = window.setTimeout(() => setAttempt((n) => n + 1), 800)
+  }, [])
+
+  /** The card's own button: a fresh URL, and the retry budget back. */
+  const retryMedia = useCallback(() => {
+    retried.current = false
+    setFailed(false)
+    setAttempt((n) => n + 1)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current !== null) clearTimeout(retryTimer.current)
+    },
+    [],
+  )
+
+  const mediaSrc = attempt > 0 ? retryUrl(item.src, attempt) : item.src
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -232,14 +300,26 @@ export function PostView({
   // `tag_string` contains every category, so the general row would show artists, characters,
   // series and meta a second time. Each is subtracted out and given its own treatment.
   const { entityChips, hiddenEntityCount } = useMemo(() => {
-    const chips: Array<{ key: string; tag: string; dot: string; aria: string }> = []
+    const chips: Array<{
+      key: string
+      tag: string
+      kind: TagTarget['kind']
+      dot: string
+      aria: string
+    }> = []
     let hidden = 0
     for (const key of ROW_ENTITY_KEYS) {
       const spec = TAG_CATEGORY[key]
       const tags = spec.read(item)
       const cap = ROW_CAPS[key]
       for (const tag of tags.slice(0, cap)) {
-        chips.push({ key: `${key}:${tag}`, tag, dot: spec.dot, aria: spec.aria })
+        chips.push({
+          key: `${key}:${tag}`,
+          tag,
+          kind: ENTITY_KIND[key] ?? null,
+          dot: spec.dot,
+          aria: spec.aria,
+        })
       }
       if (tags.length > cap) hidden += tags.length - cap
     }
@@ -282,16 +362,25 @@ export function PostView({
               <img src={item.poster} alt="" className="max-h-52 rounded-xl object-contain opacity-60" />
             )}
             <p className="text-sm text-white/70">This media could not be loaded.</p>
-            {item.sourceUrl && (
-              <a
-                href={item.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white"
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={retryMedia}
+                className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black"
               >
-                Open original
-              </a>
-            )}
+                Try again
+              </button>
+              {item.sourceUrl && (
+                <a
+                  href={item.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white"
+                >
+                  Open original
+                </a>
+              )}
+            </div>
           </div>
         ) : gated ? (
           <div className="flex max-w-xs flex-col items-center gap-3 px-6 text-center">
@@ -320,14 +409,14 @@ export function PostView({
         ) : isVideo ? (
           <video
             ref={videoRef}
-            src={item.src}
+            src={mediaSrc}
             poster={item.poster}
             loop
             muted={muted}
             playsInline
             preload={distance <= 1 ? 'auto' : 'none'}
             className="h-full w-full select-none object-contain"
-            onError={() => setFailed(true)}
+            onError={handleMediaError}
             onPlay={() => setPaused(false)}
             onPause={() => setPaused(true)}
             onTimeUpdate={(e) => {
@@ -337,16 +426,16 @@ export function PostView({
           />
         ) : (
           <img
-            src={item.src}
+            src={mediaSrc}
             alt={item.tags.slice(0, 3).join(', ')}
             draggable={false}
             loading={distance <= 3 ? 'eager' : 'lazy'}
             decoding="async"
-            onError={() => setFailed(true)}
+            onError={handleMediaError}
             className="max-h-full max-w-full select-none object-contain"
             style={{
               transform: `translate3d(${zoom.state.x}px, ${zoom.state.y}px, 0) scale(${zoom.state.s})`,
-              transition: zoom.dragging ? 'none' : 'transform 180ms ease-out',
+              transition: zoom.dragging || reduced ? 'none' : 'transform 180ms ease-out',
             }}
           />
         )}
@@ -372,19 +461,16 @@ export function PostView({
         {entityChips.length > 0 && (
           <div className="mb-2 flex flex-wrap items-center gap-2">
             {entityChips.map((chip) => (
-              <button
+              <TagChip
                 key={chip.key}
-                type="button"
-                onClick={() => onTagClick(chip.tag)}
-                aria-label={`${chip.aria} ${tagLabel(chip.tag)}`}
-                className="flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-2 pr-1.5 ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 active:scale-95"
-              >
-                <span className={`h-2 w-2 shrink-0 rounded-full ${chip.dot}`} aria-hidden />
-                <span className="truncate text-[12px] font-semibold text-white">
-                  {tagLabel(chip.tag)}
-                </span>
-                <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-white/50" />
-              </button>
+                tag={chip.tag}
+                kind={chip.kind}
+                ariaPrefix={chip.aria}
+                dot={chip.dot}
+                variant="entity"
+                onTagClick={onTagClick}
+                onTagActions={onTagActions}
+              />
             ))}
             {hiddenEntityCount > 0 && (
               <MoreTags count={hiddenEntityCount} onClick={() => onShowAllTags(item)} />
@@ -400,15 +486,15 @@ export function PostView({
             target at roughly 33px, and the all-tags sheet covers the rest. */}
         <div className="flex flex-wrap gap-2">
           {generalTags.slice(0, ROW_CAPS.general).map((tag) => (
-            <button
+            <TagChip
               key={tag}
-              type="button"
-              onClick={() => onTagClick(tag)}
-              aria-label={`${TAG_CATEGORY.general.aria} ${tagLabel(tag)}`}
-              className="relative rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85 ring-1 ring-inset ring-white/15 backdrop-blur-md transition before:absolute before:-inset-1 before:content-[''] hover:bg-white/20 active:scale-95"
-            >
-              #{tag}
-            </button>
+              tag={tag}
+              kind={null}
+              ariaPrefix={TAG_CATEGORY.general.aria}
+              variant="general"
+              onTagClick={onTagClick}
+              onTagActions={onTagActions}
+            />
           ))}
           {hiddenTagCount > 0 && (
             <MoreTags count={hiddenTagCount} onClick={() => onShowAllTags(item)} />

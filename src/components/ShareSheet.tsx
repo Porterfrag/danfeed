@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { MediaItem } from '../types'
+import { announce } from '../lib/announce'
 import { copyText } from '../lib/clipboard'
+import { postLink, searchLink } from '../lib/links'
 import { Sheet } from './Sheet'
+import { SheetRow } from './SheetRow'
 
 interface Props {
   open: boolean
@@ -10,50 +13,6 @@ interface Props {
   /** The current search box text, offered as a link into the same feed. */
   query: string
   onClose: () => void
-}
-
-/** The post's own page: the canonical home of a Danbooru post, artist credit and all. */
-function postLink(item: MediaItem) {
-  return item.postId ? `https://danbooru.donmai.us/posts/${item.postId}` : ''
-}
-
-/**
- * A link back into danfeed with this search in the box.
- *
- * Built from the current origin rather than a hard-coded host so it works from localhost during
- * development and from the deployment in public. The rating is deliberately left out: which
- * ratings the recipient sees is their setting to make, not the sender's.
- */
-function searchLink(query: string) {
-  const url = new URL('/', location.href)
-  url.searchParams.set('q', query.trim())
-  return url.toString()
-}
-
-interface RowProps {
-  id: string
-  label: string
-  sub: string
-  status: { id: string; ok: boolean } | null
-  onClick: () => void
-}
-
-function Row({ id, label, sub, status, onClick }: RowProps) {
-  const result = status?.id === id ? (status.ok ? 'Copied' : 'Could not copy') : null
-
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/8"
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm text-white">{result ?? label}</span>
-        <span className="block truncate text-[11px] text-white/40">{sub}</span>
-      </span>
-    </button>
-  )
 }
 
 export function ShareSheet({ open, item, query, onClose }: Props) {
@@ -86,13 +45,15 @@ export function ShareSheet({ open, item, query, onClose }: Props) {
   async function copy(id: string, text: string) {
     const ok = await copyText(text)
     setStatus({ key, id, ok })
+    // The row says "Copied", but focus may already have moved on; a listener gets told.
+    announce(ok ? 'Link copied' : 'Could not copy the link')
   }
 
   return (
     <Sheet open={open} title="Share" onClose={onClose}>
       <div className="flex flex-col gap-1">
         {post && (
-          <Row
+          <SheetRow
             id="post"
             label="Copy link to this post"
             sub={post}
@@ -100,7 +61,7 @@ export function ShareSheet({ open, item, query, onClose }: Props) {
             onClick={() => void copy('post', post)}
           />
         )}
-        <Row
+        <SheetRow
           id="media"
           label="Copy media link"
           sub={media}
@@ -108,7 +69,7 @@ export function ShareSheet({ open, item, query, onClose }: Props) {
           onClick={() => void copy('media', media)}
         />
         {search && (
-          <Row
+          <SheetRow
             id="search"
             label="Copy link to this search"
             sub={search}
@@ -117,7 +78,7 @@ export function ShareSheet({ open, item, query, onClose }: Props) {
           />
         )}
         {nativeShare && (
-          <Row
+          <SheetRow
             id="native"
             label="Share…"
             sub="Open your device's own share sheet"
