@@ -15,6 +15,7 @@ const ONLY = [
   'rating',
   'score',
   'tag_string',
+  'tag_string_artist',
   'media_asset',
 ].join(',')
 
@@ -176,6 +177,7 @@ export function toItem(post: DanbooruPost): MediaItem | null {
     rating: post.rating ?? undefined,
     score: post.score ?? undefined,
     tags: post.tag_string ? post.tag_string.split(' ').filter(Boolean) : [],
+    artists: post.tag_string_artist ? post.tag_string_artist.split(' ').filter(Boolean) : [],
     postId: post.id,
     sourceUrl: `${API}/posts/${post.id}`,
     origin: 'danbooru',
@@ -266,6 +268,22 @@ export async function autocompleteTags(query: string, limit = 8): Promise<TagSug
 }
 
 /* ------------------------------------------------------------------ */
+/* Display                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Human-readable form of a tag, matching Danbooru's own `label` convention: the
+ * value with underscores read as spaces. `corn_kuten` -> "corn kuten",
+ * `anna_(k0130)` -> "anna (k0130)". Hyphens are literal and stay (`chun-li`).
+ *
+ * Display only — the searchable form is the tag itself, so never put the result
+ * of this into a query.
+ */
+export function tagLabel(tag: string): string {
+  return tag.replace(/_/g, ' ')
+}
+
+/* ------------------------------------------------------------------ */
 /* Custom URL resolution                                               */
 /* ------------------------------------------------------------------ */
 
@@ -282,6 +300,7 @@ function embedFor(url: string): MediaItem | null {
       width: 16,
       height: 9,
       tags: [],
+      artists: [],
       origin: 'custom',
       title: 'YouTube',
       sourceUrl: `https://www.youtube.com/watch?v=${id}`,
@@ -297,6 +316,7 @@ function embedFor(url: string): MediaItem | null {
       width: 16,
       height: 9,
       tags: [],
+      artists: [],
       origin: 'custom',
       title: 'Vimeo',
       sourceUrl: url,
@@ -337,6 +357,7 @@ export async function resolveUrl(input: string): Promise<MediaItem> {
       width: 0,
       height: 0,
       tags: [],
+      artists: [],
       origin: 'custom',
     }
   }
@@ -349,6 +370,7 @@ export async function resolveUrl(input: string): Promise<MediaItem> {
       width: 0,
       height: 0,
       tags: [],
+      artists: [],
       origin: 'custom',
     }
   }

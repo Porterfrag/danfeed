@@ -194,6 +194,23 @@ export function useFeed(rating: RatingLevel) {
     setHomeSignal((n) => n + 1)
   }, [])
 
+  /**
+   * Jump straight to a tag's feed — what the artist chip does.
+   *
+   * Deliberately the same thing typing the tag by hand would do, with two
+   * differences: the filter chip resets to All, because an active "Videos" or "Top"
+   * chip would otherwise silently empty the feed for an artist who only posts
+   * stills, and `query` is assigned directly so the tap loads at once instead of
+   * waiting out the 450 ms typing debounce.
+   */
+  const searchTag = useCallback((tag: string) => {
+    const clean = tag.trim()
+    if (!clean) return
+    setChip('all')
+    setQueryInput(clean)
+    setQuery(clean)
+  }, [])
+
   useEffect(() => {
     const analysis = analyzeTags(tags)
     overLimitRef.current = analysis.over
@@ -225,6 +242,7 @@ export function useFeed(rating: RatingLevel) {
     retry,
     clearHistory,
     resetToDefault,
+    searchTag,
   }
 }
 

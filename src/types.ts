@@ -25,6 +25,8 @@ export interface DanbooruPost {
   rating?: string | null
   score?: number | null
   tag_string?: string | null
+  /** Space-separated artist tags. Note `tag_string` already includes these. */
+  tag_string_artist?: string | null
   media_asset?: MediaAsset | null
 }
 
@@ -40,6 +42,12 @@ export interface MediaItem {
   rating?: string
   score?: number
   tags: string[]
+  /**
+   * Artist tags, in canonical searchable form (`corn_kuten`, `anna_(k0130)`).
+   * Kept separate from `tags` because they are also *contained* in `tags` —
+   * the UI strips them from the generic tag chips so they are not shown twice.
+   */
+  artists: string[]
   postId?: number
   sourceUrl?: string
   origin: 'danbooru' | 'custom'

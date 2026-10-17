@@ -57,7 +57,21 @@ export function saveSettings(settings: Settings) {
 
 export function loadSaved(): MediaItem[] {
   const items = read<MediaItem[]>(K.saved, [])
-  return Array.isArray(items) ? items : []
+  if (!Array.isArray(items)) return []
+  return items.map(normalizeItem)
+}
+
+/**
+ * Saved items outlive the code that wrote them. An entry saved before `artists`
+ * existed has no such field, and a renderer that assumes an array would throw on it.
+ * Repair the shape here — the one boundary where stored JSON enters the app.
+ */
+function normalizeItem(item: MediaItem): MediaItem {
+  return {
+    ...item,
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    artists: Array.isArray(item.artists) ? item.artists : [],
+  }
 }
 
 export function saveSaved(items: MediaItem[]) {

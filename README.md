@@ -32,6 +32,7 @@ Fix it with Secure DNS or a VPN:
 | Filter chips | All · Videos · Photos · Animated · Top |
 | Add by URL | Danbooru post page, direct media file, or YouTube/Vimeo embed |
 | Saved | Stored in `localStorage`; double-tap a video or use the rail button |
+| Artist | Tap the artist on any slide to load everything else by them |
 | Rating | Safe by default; Moderate/Everything opt-in per browser (see below) |
 | Home | Tap the **danfeed** logo to reset: default feed, cleared search, back to top |
 | Settings | Content rating, video size cap, start-with-sound, reset history |
@@ -48,6 +49,35 @@ for the wrong thing. The UI shows `label` and inserts `value`.
 
 Suggestions are cached per prefix and debounced at 150 ms, and autocomplete has its own request lane
 so typing never queues behind a feed page load.
+
+## Browsing an artist
+
+Every slide with an artist tag shows a chip for them, above the tag row. Tapping it searches that
+artist's work, so the feed becomes "everything else by this person".
+
+The chip is a real search, not a hidden mode: the artist tag lands in the search box, where it stays
+visible, editable and clearable, and the *danfeed* logo still returns to the default feed.
+
+Three details that are easy to get wrong:
+
+- **Display is not the same as the search.** The chip reads `anna (k0130)` but searches
+  `anna_(k0130)`. This is Danbooru's own label/value split, the same rule the autocomplete follows:
+  underscores are read as spaces for humans, but only the underscored form matches anything.
+- **The artist tag is already inside `tag_string`.** Verified against the live API — every post's
+  `tag_string` includes its artist tags — so rendering `tags` as-is would show the artist twice. The
+  artist tags are filtered out of the `#tag` row and given the chip instead.
+- **Tapping an artist resets the filter chip to All.** An active *Videos* or *Top* filter would
+  otherwise silently return nothing for an artist who only posts stills, which reads as a bug rather
+  than as a filter.
+
+Collaborations show up to three chips and count the rest (`+1`), and a post with no artist tag simply
+shows no chip. Artist tags are ordinary tags, so one costs one search slot — the default `rating:` is
+free and composes with it.
+
+Artist data comes from `tag_string_artist`, which was added to the trimmed `only=` payload. Because
+that field is new, saved items written by earlier builds have no `artists` array at all; they are
+repaired on load in `lib/store.ts` rather than guarded at every render, so an old saved post cannot
+crash the feed when it is played.
 
 ## The 2-tag limit
 
@@ -139,7 +169,7 @@ if you zoom.
 
 ```
 src/
-  lib/danbooru.ts     API client, cursor paging, tag autocomplete, URL resolver
+  lib/danbooru.ts     API client, cursor paging, tag autocomplete, URL resolver, tag labels
   lib/tagQuery.ts     slot classification, rating levels, tag assembly
   lib/tagInput.ts     which word is being typed; how to apply a suggestion
   lib/store.ts        localStorage: saved / settings

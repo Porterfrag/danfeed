@@ -35,6 +35,8 @@ interface Props {
   onSavedClick: () => void
   onSettingsClick: () => void
   onHomeClick: () => void
+  /** Browse every post by one artist tag. */
+  onArtistClick: (tag: string) => void
   /** True when the feed is allowed past the general rating. Drives the settings badge. */
   nsfw: boolean
 }
@@ -65,6 +67,7 @@ export function Feed({
   onSettingsClick,
   onHomeClick,
   nsfw,
+  onArtistClick,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -177,6 +180,7 @@ export function Feed({
               maxBytes={maxBytes}
               onSave={onSave}
               onToggleMute={onToggleMute}
+              onArtistClick={onArtistClick}
             />
           </div>
         ))}

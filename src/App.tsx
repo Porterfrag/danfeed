@@ -13,7 +13,7 @@ type SheetName = 'add' | 'saved' | 'settings' | null
 export default function App() {
   const [settings, setSettings] = useState<Settings>(() => loadSettings())
   const feed = useFeed(settings.rating)
-  const { resetToDefault } = feed
+  const { resetToDefault, searchTag } = feed
   const [saved, setSaved] = useState<MediaItem[]>(() => loadSaved())
   const [extras, setExtras] = useState<MediaItem[]>([])
   const [sheet, setSheet] = useState<SheetName>(null)
@@ -59,6 +59,19 @@ export default function App() {
     resetToDefault()
   }, [resetToDefault])
 
+  /**
+   * Tapping an artist's chip searches that exact artist tag, so the feed becomes
+   * "everything by this artist" and the tag shows up in the search box — visible,
+   * editable and clearable rather than a hidden mode.
+   */
+  const browseArtist = useCallback(
+    (tag: string) => {
+      setScrollSignal((n) => n + 1)
+      searchTag(tag)
+    },
+    [searchTag],
+  )
+
   const items = useMemo(() => [...extras, ...feed.items], [extras, feed.items])
 
   const maxBytes = settings.maxVideoMb * 1024 * 1024
@@ -94,6 +107,7 @@ export default function App() {
         onSettingsClick={() => setSheet('settings')}
         onHomeClick={goHome}
         nsfw={settings.rating !== 'general'}
+        onArtistClick={browseArtist}
       />
 
       <AddUrlSheet

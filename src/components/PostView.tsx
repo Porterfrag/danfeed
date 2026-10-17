@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { MediaItem } from '../types'
+import { tagLabel } from '../lib/danbooru'
 import { useZoom } from '../lib/useZoom'
-import { IconBookmark, IconExternal, IconPlay, IconVolumeOff, IconVolumeOn } from './icons'
+import {
+  IconArtist,
+  IconBookmark,
+  IconChevronRight,
+  IconExternal,
+  IconPlay,
+  IconVolumeOff,
+  IconVolumeOn,
+} from './icons'
 
 interface Props {
   item: MediaItem
@@ -14,7 +23,13 @@ interface Props {
   maxBytes: number
   onSave: (item: MediaItem) => void
   onToggleMute: () => void
+  /** Browse everything by one artist tag. */
+  onArtistClick: (tag: string) => void
 }
+
+/** Collaborations are rare; beyond a few chips the row would swallow the slide. */
+const MAX_ARTIST_CHIPS = 3
+const MAX_TAG_CHIPS = 5
 
 const RATING_LABEL: Record<string, string> = {
   g: 'General',
@@ -46,6 +61,7 @@ export function PostView({
   maxBytes,
   onSave,
   onToggleMute,
+  onArtistClick,
 }: Props) {
   const isVideo = item.kind === 'video' || item.kind === 'ugoira'
   const isEmbed = item.kind === 'embed'
@@ -169,6 +185,14 @@ export function PostView({
 
   const rating = item.rating?.toLowerCase()
 
+  // `tag_string` already contains the artist tags, so the generic chip row would
+  // show them a second time. They get their own affordance instead.
+  const artistTags = useMemo(() => new Set(item.artists), [item.artists])
+  const otherTags = useMemo(
+    () => item.tags.filter((tag) => !artistTags.has(tag)),
+    [item.tags, artistTags],
+  )
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
       {/* Ambient backdrop so portrait/landscape media never sits on flat black. */}
@@ -282,8 +306,37 @@ export function PostView({
 
       {/* Meta */}
       <div className="absolute bottom-8 left-3 z-20 max-w-[calc(100%-5rem)]">
+        {/* Artist attribution. Tapping it searches the exact artist tag, which is how
+            the whole feed becomes "more from this artist". */}
+        {item.artists.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {item.artists.slice(0, MAX_ARTIST_CHIPS).map((artist) => (
+              <button
+                key={artist}
+                type="button"
+                onClick={() => onArtistClick(artist)}
+                aria-label={`Show more by ${tagLabel(artist)}`}
+                className="flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-1.5 pr-1.5 ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 active:scale-95"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-400 text-black">
+                  <IconArtist className="h-3 w-3" />
+                </span>
+                <span className="truncate text-[12px] font-semibold text-white">
+                  {tagLabel(artist)}
+                </span>
+                <IconChevronRight className="h-3.5 w-3.5 shrink-0 text-white/50" />
+              </button>
+            ))}
+            {item.artists.length > MAX_ARTIST_CHIPS && (
+              <span className="px-1 text-[11px] text-white/50">
+                +{item.artists.length - MAX_ARTIST_CHIPS}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-1.5">
-          {item.tags.slice(0, 5).map((tag) => (
+          {otherTags.slice(0, MAX_TAG_CHIPS).map((tag) => (
             <span
               key={tag}
               className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/85 backdrop-blur-sm"
@@ -291,9 +344,9 @@ export function PostView({
               #{tag}
             </span>
           ))}
-          {item.tags.length > 5 && (
+          {otherTags.length > MAX_TAG_CHIPS && (
             <span className="px-1 py-0.5 text-[11px] text-white/50">
-              +{item.tags.length - 5}
+              +{otherTags.length - MAX_TAG_CHIPS}
             </span>
           )}
         </div>
