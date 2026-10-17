@@ -102,6 +102,9 @@ const RELATED = {
 let preview = null
 let browser = null
 let profile = null
+/** The stubbed routes, re-stubbed mid-run to stage the last two shots. */
+let interceptor = null
+const GRADIENT_PNG = Buffer.from(GRADIENT).toString('base64')
 
 async function cleanup() {
   if (browser) await stopChrome(browser, profile)
@@ -125,13 +128,13 @@ async function main() {
   const c = await connectToPage(cdpPort)
   // Headless Chrome never gives the page system focus, so `focus()` would not open anything.
   await c.send('Emulation.setFocusEmulationEnabled', { enabled: true })
-  await stubApi(c, [
+  interceptor = await stubApi(c, [
     { match: '/autocomplete.json', json: AUTOCOMPLETE },
     { match: '/posts.json', json: POSTS },
     { match: '/related_tag.json', json: RELATED },
     {
       match: 'cdn.donmai.us',
-      image: Buffer.from(GRADIENT).toString('base64'),
+      image: GRADIENT_PNG,
       type: 'image/svg+xml',
     },
   ])
@@ -226,6 +229,36 @@ async function main() {
   await c.evalJS(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }))`)
   await sleep(400)
   await c.shot(join(OUT, 'shortcuts.png'))
+  await c.evalJS(`document.querySelector('[aria-label="Close"]').click()`)
+  await sleep(300)
+
+  // Two states that need staging rather than clicking: a slow image, and no input at all.
+  //
+  // Route order stages the first — the preview answers instantly, the sample is held back — so
+  // the poll happens while the placeholder still carries the frame. Then the same page sits
+  // untouched past the idle window, and the label and rail step back to a quarter.
+  if (interceptor) c.off(interceptor)
+  interceptor = await stubApi(c, [
+    { match: '/autocomplete.json', json: AUTOCOMPLETE },
+    { match: '/posts.json', json: POSTS },
+    { match: '/related_tag.json', json: RELATED },
+    { match: '180x180', image: GRADIENT_PNG, type: 'image/svg+xml' },
+    { match: 'cdn.donmai.us', image: GRADIENT_PNG, type: 'image/svg+xml', delay: 2500 },
+  ])
+  await c.send('Page.navigate', { url: appUrl })
+  await waitForSlides(c, POSTS.length)
+  await sleep(900)
+  await c.shot(join(OUT, 'blur-up.png'))
+  await sleep(4000)
+  await c.shot(join(OUT, 'quiet.png'))
+
+  // Woken up, then the filled bookmark: the rail's one white button, and the only place a save
+  // shows at rest.
+  await c.evalJS(`document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`)
+  await sleep(300)
+  await c.evalJS(`document.querySelector('[aria-label="Save"]').click()`)
+  await sleep(400)
+  await c.shot(join(OUT, 'saved.png'))
 
   if (readme) {
     // The three the repository page links to. These are commits, not build output, so they are

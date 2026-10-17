@@ -121,8 +121,9 @@ export async function connectToPage(port, { tries = 60 } = {}) {
  *
  * A route may set `type` to override the content type (the screenshot harness serves SVG),
  * `status` to answer with a failure instead of 200, `fail` to answer with that failure for the
- * first N requests before behaving normally, and `failNetwork` to drop the connection for the
- * first N — how a transient 5xx is staged for the retry tests.
+ * first N requests before behaving normally, `failNetwork` to drop the connection for the
+ * first N — how a transient 5xx is staged for the retry tests — and `delay` to hold the answer
+ * back that many milliseconds, which is how a slow image is staged for the blur-up.
  */
 export async function stubApi(cdp, routes, { requestStage = false } = {}) {
   await cdp.send('Fetch.enable', {
@@ -189,6 +190,8 @@ export async function stubApi(cdp, routes, { requestStage = false } = {}) {
     if (route.contentLength) {
       headers.push({ name: 'content-length', value: String(Buffer.from(body, 'base64').length) })
     }
+
+    if (route.delay) await sleep(route.delay)
 
     try {
       await cdp.send('Fetch.fulfillRequest', {
